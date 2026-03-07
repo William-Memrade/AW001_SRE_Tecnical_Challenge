@@ -72,6 +72,12 @@ stages:
           script: |
             shellcheck $(working_directory)/scripts/*.sh || true
 
+      - task: qetza.replacetokens.replacetokens-task.replacetokens@6
+        displayName: 'Replace tokens in Scripts and Manifests'
+        inputs:
+          sources: '$(working_directory)/**/*.sh, $(working_directory)/**/*.yaml'
+          tokenPattern: 'default'
+
       - task: PublishPipelineArtifact@1
         displayName: 'Publish Kubernetes Manifests Artifact'
         inputs:
