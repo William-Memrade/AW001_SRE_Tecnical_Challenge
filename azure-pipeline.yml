@@ -8,7 +8,7 @@ trigger:
     exclude:
       - 'azure-pipeline.yml'
 
-pool: 'ubuntu-latest'
+pool: k8s-agents
 name: CI - Validate Kubernetes
 
 variables:
