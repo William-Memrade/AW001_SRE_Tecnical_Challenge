@@ -1,26 +1,31 @@
+---
 # helm/values-nginx.yaml
 
-# 12. Configuración de cantidad de réplicas
 replicaCount: 2
 
-# 12. Configuración de recursos mínimos (requests) requeridos para CPU y Memoria
 resources:
   requests:
     cpu: "10m"
     memory: "64Mi"
-  # Buena práctica: definir límites para evitar sobreconsumo
   limits:
     cpu: "100m"
     memory: "128Mi"
 
-# 13. Configuración de la página personalizada mediante serverBlock
-# Esto inyecta directamente la respuesta HTML en NGINX sin necesidad de montar archivos
 serverBlock: |-
   server {
     listen 0.0.0.0:8080;
     location / {
       default_type text/html;
-      return 200 '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Hola Mundo</title></head><body><h1>Hola Mundo me gusta jugar con kubernetes</h1></body></html>';
+      return 200 '<!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Hola Mundo</title>
+        </head>
+        <body>
+          <h1>Hola Mundo me gusta jugar con kubernetes</h1>
+        </body>
+      </html>';
     }
   }
 
