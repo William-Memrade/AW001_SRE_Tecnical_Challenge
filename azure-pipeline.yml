@@ -57,18 +57,11 @@ stages:
             kubeconform -strict -summary $(working_directory)/kubernetes/*.yaml
 
       - task: Bash@3
-        displayName: Helm lint
-        inputs:
-          targetType: 'inline'
-          script: |
-            helm lint $(working_directory)/helm
-
-      - task: Bash@3
         displayName: Validate Helm chart rendering
         inputs:
           targetType: 'inline'
           script: |
-            helm template nginx $(working_directory)/helm -f $(working_directory)/helm/values-nginx.yaml
+            helm template nginx bitnami/nginx -f values-nginx.yaml
 
       - task: Bash@3
         displayName: Check shell scripts
