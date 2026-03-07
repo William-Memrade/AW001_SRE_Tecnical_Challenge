@@ -61,7 +61,9 @@ stages:
         inputs:
           targetType: 'inline'
           script: |
-            helm template nginx bitnami/nginx -f values-nginx.yaml
+            helm repo add bitnami https://charts.bitnami.com/bitnami
+            helm repo update
+            helm template nginx bitnami/nginx -f $(working_directory)/helm/values-nginx.yaml
 
       - task: Bash@3
         displayName: Check shell scripts
