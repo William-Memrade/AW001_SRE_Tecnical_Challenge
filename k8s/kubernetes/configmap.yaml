@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-index-html
+  labels:
+    app: hello-kops
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8">
+      <title>Hola Mundo</title>
+      <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+      </style>
+    </head>
+    <body>
+      <h1>Hola Mundo Guillermo</h1>
+      <p>Desplegado en un clúster provisto por KOps en AWS.</p>
+    </body>
+    </html>
