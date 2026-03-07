@@ -5,26 +5,22 @@ set -e
 # Script para aprovisionar un cluster de Kubernetes en AWS usando KOps
 # ==============================================================================
 
-# Variables (Modificar según configuración de AWS)
-#export NAME="kops-memrade.com"         # Nombre del cluster 
-export KOPS_STATE_STORE="s3://kops-s3-memrade"
-export AWS_REGION="us-east-2"
-export ZONES="us-east-2a"
+# Free Trail no me permitio configurar dominio con Route 53
+# Por lo que usamos un cluster basado en gossip (terminando el NAME en .k8s.local)
+export NAME="$EKS_NAME"
+export KOPS_STORAGE_BUCKET="$KOPS_STORAGE_BUCKET"
+export AWS_REGION="$AWS_REGION"
+export ZONES="$AWS_ZONES"
 
 echo "1. Crear el bucket en S3 para almacenar el estado de KOps"
 aws s3api create-bucket \
-    --bucket kops-s3-memrade \
+    --bucket $KOPS_STORAGE_BUCKET \
     --region $AWS_REGION
 
 echo "Habilitar versionado en el bucket de S3 (Recomendado para respaldos)"
 aws s3api put-bucket-versioning \
-    --bucket kops-s3-memrade \
+    --bucket $KOPS_STORAGE_BUCKET \
     --versioning-configuration Status=Enabled
-
-# Nota: Antes de ejecutar, asegúrate de tener configurado tu dominio en Route53 
-# o usar un cluster basado en gossip (terminando el NAME en .k8s.local)
-# Para desarrollo rápido sin dominio registrado, cambiamos NAME a guillermo.k8s.local
-export NAME="guillermo.k8s.local"
 
 echo "2. Crear la configuración del cluster (solo definición)"
 kops create cluster \
