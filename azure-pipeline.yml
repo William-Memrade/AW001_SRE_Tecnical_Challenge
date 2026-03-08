@@ -161,6 +161,25 @@ stages:
               --namespace default \
               --create-namespace
 
+      - task: Bash@3
+        displayName: Print Public URLs
+        inputs:
+          targetType: inline
+          script: |
+            echo "=============================================================================="
+            echo "🎉 DESPLIEGUES FINALIZADOS CON ÉXITO 🎉"
+            echo "=============================================================================="
+            echo "Extrayendo URLs públicas de AWS Elastic Load Balancer..."
+            
+            echo "🌐 URL 1: Nginx (Manifiestos manuales / ConfigMap propio)"
+            MANIFEST_URL=$(kubectl get svc nginx-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            echo "-> http://$MANIFEST_URL"
+            
+            echo "🌐 URL 2: Nginx (Helm Chart)"
+            HELM_URL=$(kubectl get svc nginx -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            echo "-> http://$HELM_URL"
+            echo "=============================================================================="
+
 - stage: DeploymentDestroy
   dependsOn: Deploy
   jobs:
