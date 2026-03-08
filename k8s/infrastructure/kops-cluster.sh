@@ -59,13 +59,35 @@ kops update cluster --name ${NAME} --yes --admin
 echo "4. Preparando DNS local para la comunicación directa con el Master (Gossip workaround)"
 echo "Buscando IP pública del Control Plane..."
 
-MASTER_IP=$(aws ec2 describe-instances \
-    --region "$AWS_REGION" \
-    --filters "Name=tag:KubernetesCluster,Values=$NAME" "Name=instance-state-name,Values=running" "Name=tag:k8s.io/role/control-plane,Values=1" \
-    --query "Reservations[*].Instances[*].PublicIpAddress" \
-    --output text | awk '{print $1}')
+n=0
+while [ $n -le 15 ]; do
+    # Buscar por tag de KOps (puede ser control-plane o master dependiendo de la versión)
+    MASTER_IP=$(aws ec2 describe-instances \
+        --region "$AWS_REGION" \
+        --filters "Name=tag:KubernetesCluster,Values=$NAME" "Name=instance-state-name,Values=running" "Name=tag:k8s.io/role/control-plane,Values=1" \
+        --query "Reservations[*].Instances[*].PublicIpAddress" \
+        --output text | awk '{print $1}')
     
-echo "$MASTER_IP api.$NAME" | sudo tee -a /etc/hosts
+    # Fallback si usa la etiqueta antigua "master"
+    if [ -z "$MASTER_IP" ] || [ "$MASTER_IP" == "None" ]; then
+        MASTER_IP=$(aws ec2 describe-instances \
+            --region "$AWS_REGION" \
+            --filters "Name=tag:KubernetesCluster,Values=$NAME" "Name=instance-state-name,Values=running" "Name=tag:k8s.io/role/master,Values=1" \
+            --query "Reservations[*].Instances[*].PublicIpAddress" \
+            --output text | awk '{print $1}')
+    fi
+    
+    if [ -n "$MASTER_IP" ] && [ "$MASTER_IP" != "None" ]; then
+        echo "IP del Control Plane encontrada: $MASTER_IP"
+        # Agregar al hosts del runner para que resuelva api.guillermo.k8s.local
+        echo "$MASTER_IP api.$NAME" | sudo tee -a /etc/hosts
+        break
+    else
+        echo "Aún no hay IP pública asignada, reintentando en 10s..."
+        sleep 10
+        n=$((n+1))
+    fi
+done
 
 echo "5. Validar el cluster"
 echo "La validación tomará unos minutos mientras inician las instancias EC2 y los servicios de Kubernetes..."
