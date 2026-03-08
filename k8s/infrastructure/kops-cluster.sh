@@ -27,17 +27,23 @@ else
     echo "1. Bucket S3 $KOPS_STORAGE_BUCKET ya existe, omitiendo creación."
 fi
 
+export KOPS_STATE_STORE="s3://${KOPS_STORAGE_BUCKET}"
+
 echo "2. Crear la configuración del cluster (solo definición)"
-kops create cluster \
-    --name=${NAME} \
-    --cloud=aws \
-    --zones=${ZONES} \
-    --node-count=2 \
-    --node-size=t2.micro \
-    --control-plane-size=t2.micro \
-    --topology=public \
-    --dns=private \
-    --api-loadbalancer-class=classic
+if ! kops get cluster --name "${NAME}" --state="${KOPS_STATE_STORE}" > /dev/null 2>&1; then
+    kops create cluster \
+        --name=${NAME} \
+        --state=${KOPS_STATE_STORE} \
+        --zones=${ZONES} \
+        --control-plane-size=t2.micro \
+        --node-count=2 \
+        --node-size=t2.micro \
+        --topology=public \
+        --dns=private \
+        --yes
+else
+    echo "La configuración del cluster ${NAME} ya existe en KOps. Omitiendo creación."
+fi
 
 echo "3. Aplicar los cambios y crear físicamente los recursos en AWS"
 kops update cluster --name ${NAME} --yes --admin
