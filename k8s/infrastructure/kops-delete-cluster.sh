@@ -49,7 +49,7 @@ if aws s3api head-bucket --bucket "$KOPS_STORAGE_BUCKET" 2>/dev/null; then
                 --query='{Objects: DeleteMarkers[].{Key:Key,VersionId:VersionId}}')" || true
                 
         # Por último eliminar el bucket:
-        aws s3 rb $KOPS_STORAGE_BUCKET --force
+        aws s3 rb s3://$KOPS_STORAGE_BUCKET --force
         echo "   Bucket S3 eliminado correctamente."
     else
         echo "   El bucket S3 se mantendrá intacto."
