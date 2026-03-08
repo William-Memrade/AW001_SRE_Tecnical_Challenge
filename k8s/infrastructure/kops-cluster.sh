@@ -9,7 +9,7 @@ export ZONES="${AWS_ZONES:-us-east-1a}"
 export AWS_REGION="${AWS_REGION:-us-east-1}"
 # Usamos el nombre local de EKS_CLUSTER_NAME para gossip (ej. cluster.k8s.local)
 export NAME="${EKS_CLUSTER_NAME}"
-export KOPS_STORAGE_BUCKET="${STORAGE_BUCKET}"
+export KOPS_STORAGE_BUCKET="${KOPS_STORAGE_BUCKET}"
 export KOPS_STATE_STORE="s3://${KOPS_STORAGE_BUCKET}"
 
 if [[ -z "${KOPS_STATE_STORE:-}" ]]; then

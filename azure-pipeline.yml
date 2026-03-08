@@ -131,7 +131,7 @@ stages:
             bash $(working_directory)/infrastructure/kops-cluster.sh
         env:
           EKS_CLUSTER_NAME: $(EKS_CLUSTER_NAME)
-          STORAGE_BUCKET: $(KOPS_STATE_STORE)
+          KOPS_STORAGE_BUCKET: $(KOPS_STORAGE_BUCKET)
           AWS_REGION: $(AWS_REGION)
           AWS_ZONES: $(AWS_ZONES)
 
@@ -141,7 +141,7 @@ stages:
           targetType: inline
           script: |
             # Exportar el S3
-            kops export kubeconfig --admin --name $(EKS_CLUSTER_NAME) --state $(STORAGE_BUCKET)
+            kops export kubeconfig --admin --name $(EKS_CLUSTER_NAME) --state $(KOPS_STORAGE_BUCKET)
 
       - task: Bash@3
         displayName: Deploy to Kubernetes (EKS - Manifestos)
