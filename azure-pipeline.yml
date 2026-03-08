@@ -72,21 +72,6 @@ stages:
           script: |
             shellcheck $(working_directory)/scripts/*.sh || true
 
-      - task: qetza.replacetokens.replacetokens-task.replacetokens@6
-        displayName: 'Replace tokens in Scripts and Manifests'
-        inputs:
-          sources: |
-            $(working_directory)/**/*.sh
-            $(working_directory)/**/*.yaml
-          tokenPattern: 'default'
-
-      - task: PublishPipelineArtifact@1
-        displayName: 'Publish Kubernetes Manifests Artifact'
-        inputs:
-          targetPath: '$(working_directory)'
-          artifactName: 'k8s-manifests'
-          publishLocation: 'pipeline'
-
 - stage: DeploymentApprover
   dependsOn: Build
   jobs:
@@ -108,13 +93,6 @@ stages:
   jobs:
     - job: deploy_kubernetes
       steps:
-      - task: DownloadPipelineArtifact@2
-        displayName: 'Download Kubernetes Manifests Artifact'
-        inputs:
-          buildType: 'current'
-          artifactName: 'k8s-manifests'
-          targetPath: '$(working_directory)'
-
       - task: Bash@3
         displayName: Install dependencies
         inputs:
@@ -151,6 +129,11 @@ stages:
             # Ejecutar el script idempotente de creación de cluster
             chmod +x $(working_directory)/infrastructure/kops-cluster.sh
             bash $(working_directory)/infrastructure/kops-cluster.sh
+        env:
+          EKS_CLUSTER_NAME: $(EKS_CLUSTER_NAME)
+          STORAGE_BUCKET: $(KOPS_STATE_STORE)
+          AWS_REGION: $(AWS_REGION)
+          AWS_ZONES: $(AWS_ZONES)
 
       - task: Bash@3
         displayName: Update kubeconfig via KOps

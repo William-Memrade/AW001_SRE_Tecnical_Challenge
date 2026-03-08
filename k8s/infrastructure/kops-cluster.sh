@@ -7,10 +7,10 @@ set -e
 
 # Free Trail no me permitio configurar dominio con Route 53
 # Por lo que usamos un cluster basado en gossip (terminando el NAME en .k8s.local)
-export NAME="#{EKS_NAME}#"
-export KOPS_STORAGE_BUCKET="#{STORAGE_BUCKET}#"
-export AWS_REGION="#{AWS_REGION}#"
-export ZONES="#{AWS_ZONES}#"
+export NAME="${EKS_CLUSTER_NAME}"
+export KOPS_STORAGE_BUCKET="${STORAGE_BUCKET}"
+export AWS_REGION="${AWS_REGION}"
+export ZONES="${AWS_ZONES}"
 
 echo "1. Crear el bucket en S3 para almacenar el estado de KOps"
 aws s3api create-bucket \
