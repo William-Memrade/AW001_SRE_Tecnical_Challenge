@@ -151,15 +151,17 @@ stages:
             chmod +x $(working_directory)/scripts/deploy.sh
             bash $(working_directory)/scripts/deploy.sh
 
-      # - task: Bash@3
-      #   displayName: Deploy Nginx with Helm
-      #   inputs:
-      #     targetType: inline
-      #     script: |
-      #       helm upgrade --install nginx $(working_directory)/helm \
-      #         -f $(working_directory)/helm/values-nginx.yaml \
-      #         --namespace default \
-      #         --create-namespace
+      - task: Bash@3
+        displayName: Deploy Nginx with Helm
+        inputs:
+          targetType: inline
+          script: |
+            helm repo add bitnami https://charts.bitnami.com/bitnami
+            helm repo update
+            helm upgrade --install nginx bitnami/nginx \
+              -f $(working_directory)/helm/values-nginx.yaml \
+              --namespace default \
+              --create-namespace
 
 - stage: DeploymentDestroy
   dependsOn: Deploy
