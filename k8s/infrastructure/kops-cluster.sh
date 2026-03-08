@@ -56,8 +56,19 @@ kops replace -f cluster-config.yaml --state=${KOPS_STATE_STORE} --force
 echo "3. Aplicar los cambios y crear físicamente los recursos en AWS"
 kops update cluster --name ${NAME} --yes --admin
 
-echo "4. Validar el cluster"
-echo "La validación tomará unos minutos mientras inician las instancias EC2..."
+echo "4. Preparando DNS local para la comunicación directa con el Master (Gossip workaround)"
+echo "Buscando IP pública del Control Plane..."
+
+MASTER_IP=$(aws ec2 describe-instances \
+    --region "$AWS_REGION" \
+    --filters "Name=tag:KubernetesCluster,Values=$NAME" "Name=instance-state-name,Values=running" "Name=tag:k8s.io/role/control-plane,Values=1" \
+    --query "Reservations[*].Instances[*].PublicIpAddress" \
+    --output text | awk '{print $1}')
+    
+echo "$MASTER_IP api.$NAME" | sudo tee -a /etc/hosts
+
+echo "5. Validar el cluster"
+echo "La validación tomará unos minutos mientras inician las instancias EC2 y los servicios de Kubernetes..."
 kops validate cluster --wait 10m
 
 echo "Exportar KUBECONFIG a la terminal actual (por lo general KOps lo actualiza automáticamente en ~/.kube/config)"
