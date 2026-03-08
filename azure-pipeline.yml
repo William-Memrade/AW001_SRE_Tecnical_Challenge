@@ -156,9 +156,7 @@ stages:
         inputs:
           targetType: inline
           script: |
-            helm repo add bitnami https://charts.bitnami.com/bitnami
-            helm repo update
-            helm upgrade --install nginx bitnami/nginx \
+            helm upgrade --install nginx oci://registry-1.docker.io/bitnamicharts/nginx \
               -f $(working_directory)/helm/values-nginx.yaml \
               --namespace default \
               --create-namespace
