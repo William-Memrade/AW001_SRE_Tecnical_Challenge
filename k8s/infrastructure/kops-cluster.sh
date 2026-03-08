@@ -13,19 +13,19 @@ if ! aws s3api head-bucket --bucket "${KOPS_STORAGE_BUCKET}" 2>/dev/null; then
 fi
 
 # 2. Validar si el clúster ya existe
-if kops get cluster --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" > /dev/null 2>&1; then
+if kops get cluster --name "$EKS_CLUSTER_NAME" --state "$KOPS_STORAGE_BUCKET" > /dev/null 2>&1; then
     echo "=========================================="
     echo "El clúster ya existe. Ejecutando UPDATE..."
     echo "=========================================="
     
     # Igual que en creation, debemos forzar a KOps a olvidar el NLB (AWS Free Tier) antes de actualizar
-    kops get cluster --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" -o yaml > cluster-config-update.yaml
+    kops get cluster --name "$EKS_CLUSTER_NAME" --state "$KOPS_STORAGE_BUCKET" -o yaml > cluster-config-update.yaml
     
     pip3 install pyyaml || true
     python3 $(dirname "$0")/remove_kops_lb.py cluster-config-update.yaml
     
-    kops replace -f cluster-config-update.yaml --state "s3://$KOPS_STORAGE_BUCKET" --force
-    kops update cluster --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" --yes --admin
+    kops replace -f cluster-config-update.yaml --state "$KOPS_STORAGE_BUCKET" --force
+    kops update cluster --name "$EKS_CLUSTER_NAME" --state "$KOPS_STORAGE_BUCKET" --yes --admin
     
 else
     echo "=========================================="
@@ -40,12 +40,12 @@ else
     # Removemos la configuración del LoadBalancer con Python y luego reemplazamos
     kops create cluster \
         --name "$EKS_CLUSTER_NAME" \
-        --state "s3://$KOPS_STORAGE_BUCKET" \
+        --state "$KOPS_STORAGE_BUCKET" \
         --zones "$AWS_ZONES" \
         --control-plane-size "t3.small" \
         --control-plane-volume-size 10 \
         --node-size "t3.small" \
-        --node-count 1 \
+        --node-count 2 \
         --node-volume-size 10 \
         --networking calico \
         --topology public \
@@ -58,8 +58,8 @@ else
     python3 $(dirname "$0")/remove_kops_lb.py cluster-config.yaml
     
     echo "Aplicando configuración modificada..."
-    kops replace -f cluster-config.yaml --state "s3://$KOPS_STORAGE_BUCKET" --force
-    kops update cluster --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" --yes --admin
+    kops replace -f cluster-config.yaml --state "$KOPS_STORAGE_BUCKET" --force
+    kops update cluster --name "$EKS_CLUSTER_NAME" --state "$KOPS_STORAGE_BUCKET" --yes --admin
 fi
 
 echo "=============================================================================="
@@ -94,10 +94,10 @@ while [ $n -le 15 ]; do
 done
 
 echo "Esperando validación completa de KOps (esto tardará unos minutos)..."
-kops validate cluster --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" --wait 15m
+kops validate cluster --name "$EKS_CLUSTER_NAME" --state "$KOPS_STORAGE_BUCKET" --wait 15m
 
 echo "Exportando kubeconfig..."
-kops export kubeconfig --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" --admin
+kops export kubeconfig --name "$EKS_CLUSTER_NAME" --state "$KOPS_STORAGE_BUCKET" --admin
 
 echo "Validando nodos..."
 kubectl get nodes -o wide
