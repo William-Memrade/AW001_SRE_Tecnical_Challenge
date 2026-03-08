@@ -29,20 +29,30 @@ else
     # y adaptado tu template. 
     # Modificado a instancias t3.small para master (Kubernetes moderno demanda ~2GB RAM para API)
     # y t3.micro para el worker node, reduciendo a 1 solo nodo para no agotar la Free Tier.
+    # En cuenta Free Tier, AWS rechaza los LoadBalancers. Por tanto aplicamos primero en DRy RUN
+    # Removemos la configuración del LoadBalancer con Python y luego reemplazamos
     kops create cluster \
         --name "$EKS_CLUSTER_NAME" \
         --state "s3://$KOPS_STORAGE_BUCKET" \
         --zones "$AWS_ZONES" \
         --control-plane-size "t3.small" \
-        --master-volume-size 10 \
+        --control-plane-volume-size 10 \
         --node-size "t3.micro" \
         --node-count 1 \
         --node-volume-size 10 \
         --networking calico \
-        --container-runtime containerd \
         --topology public \
         --dns public \
-        --yes
+        --dry-run -o yaml > cluster-config.yaml
+        
+    echo "Removiendo el NLB del API Server para AWS Free Tier..."
+    # Primero necesitamos instalar PyYAML temporalmente para el script de parche
+    pip3 install pyyaml || true
+    python3 $(dirname "$0")/remove_kops_lb.py cluster-config.yaml
+    
+    echo "Aplicando configuración modificada..."
+    kops replace -f cluster-config.yaml --state "s3://$KOPS_STORAGE_BUCKET" --force
+    kops update cluster --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" --yes
 fi
 
 echo "=============================================================================="
