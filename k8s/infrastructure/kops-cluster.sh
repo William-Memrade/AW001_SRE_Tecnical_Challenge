@@ -12,15 +12,20 @@ export KOPS_STORAGE_BUCKET="${STORAGE_BUCKET}"
 export AWS_REGION="${AWS_REGION}"
 export ZONES="${AWS_ZONES}"
 
-echo "1. Crear el bucket en S3 para almacenar el estado de KOps"
-aws s3api create-bucket \
-    --bucket $KOPS_STORAGE_BUCKET \
-    --region $AWS_REGION
+# Validar si el bucket S3 ya existe
+if ! aws s3api head-bucket --bucket "$KOPS_STORAGE_BUCKET" 2>/dev/null; then
+    echo "1. Crear el bucket en S3 para almacenar el estado de KOps"
+    aws s3api create-bucket \
+        --bucket $KOPS_STORAGE_BUCKET \
+        --region $AWS_REGION
 
-echo "Habilitar versionado en el bucket de S3 (Recomendado para respaldos)"
-aws s3api put-bucket-versioning \
-    --bucket $KOPS_STORAGE_BUCKET \
-    --versioning-configuration Status=Enabled
+    echo "Habilitar versionado en el bucket de S3 (Recomendado para respaldos)"
+    aws s3api put-bucket-versioning \
+        --bucket $KOPS_STORAGE_BUCKET \
+        --versioning-configuration Status=Enabled
+else
+    echo "1. Bucket S3 $KOPS_STORAGE_BUCKET ya existe, omitiendo creación."
+fi
 
 echo "2. Crear la configuración del cluster (solo definición)"
 kops create cluster \
