@@ -6,23 +6,18 @@ set -e
 # y el bucket S3 asociado para evitar costos en AWS.
 # ==============================================================================
 
-export AWS_REGION="${AWS_REGION:-us-east-1}"
-export NAME="${EKS_CLUSTER_NAME}"
-export KOPS_STORAGE_BUCKET="${KOPS_STORAGE_BUCKET}"
-export KOPS_STATE_STORE="${KOPS_STORAGE_BUCKET}"
-
 echo "=============================================================================="
-echo " AWS Free Tier - Eliminando el cluster: $NAME"
+echo " AWS Free Tier - Eliminando el cluster: $EKS_CLUSTER_NAME"
 echo "=============================================================================="
 
 # 1. Eliminar el cluster de KOps
-if kops get cluster --name "${NAME}" --state="${KOPS_STATE_STORE}" > /dev/null 2>&1; then
+if kops get cluster --name "${EKS_CLUSTER_NAME}" --state="s3://${KOPS_STORAGE_BUCKET}" > /dev/null 2>&1; then
     echo "1. Eliminando el cluster de KOps (EC2, VPC, EBS, etc.)..."
     # Primero hacemos un dry-run implícito al listar y luego borramos con --yes
-    kops delete cluster --name ${NAME} --state=${KOPS_STATE_STORE} --yes
+    kops delete cluster --name ${EKS_CLUSTER_NAME} --state="s3://${KOPS_STORAGE_BUCKET}" --yes
     echo "Cluster de Kubernetes eliminado correctamente."
 else
-    echo "1. El cluster $NAME no fue encontrado en KOps o ya fue eliminado."
+    echo "1. El cluster $EKS_CLUSTER_NAME no fue encontrado en KOps o ya fue eliminado."
 fi
 
 # 2. Eliminar el bucket S3 (opcional, pero sugerido para evitar gastos de almacenamiento)
@@ -65,8 +60,8 @@ fi
 
 # 3. Limpiar archivo hosts local
 echo "3. Limpiando entradas locales del proxy de /etc/hosts..."
-# Remueve cualquier línea que contenga `api.$NAME`
-sudo sed -i "/api\.$NAME/d" /etc/hosts || true
+# Remueve cualquier línea que contenga `api.$EKS_CLUSTER_NAME`
+sudo sed -i "/api\.$EKS_CLUSTER_NAME/d" /etc/hosts || true
 
 echo "=============================================================================="
 echo " PROCESO DE ELIMINACIÓN COMPLETADO."
