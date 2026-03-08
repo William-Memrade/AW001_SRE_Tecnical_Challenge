@@ -45,6 +45,37 @@ else
         --yes
 fi
 
+echo "=============================================================================="
+echo " INYECTANDO DNS LOCAL PARA COMUNICACIÓN GOSSIP "
+echo "=============================================================================="
+n=0
+while [ $n -le 15 ]; do
+    # Búsqueda a prueba de fallas usando Security Groups
+    SG_MASTER_ID=$(aws ec2 describe-security-groups \
+        --region "$AWS_REGION" \
+        --filters "Name=group-name,Values=masters.$EKS_CLUSTER_NAME" \
+        --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || echo "None")
+        
+    if [ "$SG_MASTER_ID" != "None" ] && [ -n "$SG_MASTER_ID" ]; then
+        MASTER_IP=$(aws ec2 describe-instances \
+            --region "$AWS_REGION" \
+            --filters "Name=instance.group-id,Values=$SG_MASTER_ID" "Name=instance-state-name,Values=running" \
+            --query "Reservations[*].Instances[*].PublicIpAddress" \
+            --output text | awk '{print $1}')
+            
+        if [ -n "${MASTER_IP:-}" ] && [ "$MASTER_IP" != "None" ]; then
+            echo "IP del Control Plane encontrada: $MASTER_IP"
+            sudo sed -i "/api\.$EKS_CLUSTER_NAME/d" /etc/hosts || true
+            echo "$MASTER_IP api.$EKS_CLUSTER_NAME" | sudo tee -a /etc/hosts
+            break
+        fi
+    fi
+    
+    echo "Aún no hay IP pública asignada, reintentando en 10s..."
+    sleep 10
+    n=$((n+1))
+done
+
 echo "Esperando validación completa de KOps (esto tardará unos minutos)..."
 kops validate cluster --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" --wait 15m
 
