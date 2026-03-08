@@ -8,7 +8,7 @@ set -e
 
 export AWS_REGION="${AWS_REGION:-us-east-1}"
 export NAME="${EKS_CLUSTER_NAME}"
-export KOPS_STORAGE_BUCKET="${STORAGE_BUCKET}"
+export KOPS_STORAGE_BUCKET="${KOPS_STORAGE_BUCKET}"
 export KOPS_STATE_STORE="s3://${KOPS_STORAGE_BUCKET}"
 
 echo "=============================================================================="

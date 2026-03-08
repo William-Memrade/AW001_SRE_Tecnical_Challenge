@@ -86,12 +86,89 @@ stages:
 #           - script: echo "Esperando aprobación para continuar con el despliegue..."
 #             displayName: 'Approval Step'
 
-- stage: Deploy
-  displayName: Deploy to Kubernetes
-  # dependsOn: DeploymentApprover
-  # condition: succeeded()
+# - stage: Deploy
+#   displayName: Deploy to Kubernetes
+#   # dependsOn: DeploymentApprover
+#   # condition: succeeded()
+#   jobs:
+#     - job: deploy_kubernetes
+#       steps:
+#       - task: Bash@3
+#         displayName: Install dependencies
+#         inputs:
+#           targetType: 'inline'
+#           script: |
+#             sudo apt-get update
+#             sudo apt-get install -y awscli
+
+#             curl -LO https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl
+#             chmod +x kubectl
+#             sudo mv kubectl /usr/local/bin/
+
+#             curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+#       - task: Bash@3
+#         displayName: Configure AWS Credentials
+#         inputs:
+#           targetType: inline
+#           script: |
+#             aws configure set aws_access_key_id $(AWS_ACCESS_KEY_ID)
+#             aws configure set aws_secret_access_key $(AWS_SECRET_ACCESS_KEY)
+#             aws configure set default.region $(AWS_REGION)
+
+#       - task: Bash@3
+#         displayName: Provision KOps Cluster (Infrastructure)
+#         inputs:
+#           targetType: inline
+#           script: |
+#             # Instalar kops
+#             curl -Lo kops https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | grep tag_name | cut -d '"' -f 4)/kops-linux-amd64
+#             chmod +x kops
+#             sudo mv kops /usr/local/bin/kops
+
+#             # Ejecutar el script idempotente de creación de cluster
+#             chmod +x $(working_directory)/infrastructure/kops-cluster.sh
+#             bash $(working_directory)/infrastructure/kops-cluster.sh
+#         env:
+#           EKS_CLUSTER_NAME: $(EKS_CLUSTER_NAME)
+#           KOPS_STORAGE_BUCKET: $(KOPS_STORAGE_BUCKET)
+#           AWS_REGION: $(AWS_REGION)
+#           AWS_ZONES: $(AWS_ZONES)
+
+#       - task: Bash@3
+#         displayName: Update kubeconfig via KOps
+#         inputs:
+#           targetType: inline
+#           script: |
+#             # Exportar el S3
+#             kops export kubeconfig --admin --name $(EKS_CLUSTER_NAME) --state s3://$(KOPS_STORAGE_BUCKET)
+
+#       - task: Bash@3
+#         displayName: Deploy to Kubernetes (EKS - Manifestos)
+#         inputs:
+#           targetType: 'inline'
+#           script: |
+#             chmod +x $(working_directory)/scripts/deploy.sh
+#             bash $(working_directory)/scripts/deploy.sh
+
+#       # - task: Bash@3
+#       #   displayName: Deploy Nginx with Helm
+#       #   inputs:
+#       #     targetType: inline
+#       #     script: |
+#       #       helm upgrade --install nginx $(working_directory)/helm \
+#       #         -f $(working_directory)/helm/values-nginx.yaml \
+#       #         --namespace default \
+#       #         --create-namespace
+
+- stage: Destroy
+  displayName: Destroy Kubernetes Cluster
+  # dependsOn: Deploy
+  # Solo se ejecutará este stage si explícitamente se le da "Run" de forma manual en Azure DevOps
+  # condition: failed() # Comentar o cambiar como sea necesario en Azure para que no borre en caso de exito automático
   jobs:
-    - job: deploy_kubernetes
+    - job: destroy_kubernetes
+      displayName: Tear Down KOps Cluster
       steps:
       - task: Bash@3
         displayName: Install dependencies
@@ -101,11 +178,9 @@ stages:
             sudo apt-get update
             sudo apt-get install -y awscli
 
-            curl -LO https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl
-            chmod +x kubectl
-            sudo mv kubectl /usr/local/bin/
-
-            curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+            curl -Lo kops https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | grep tag_name | cut -d '"' -f 4)/kops-linux-amd64
+            chmod +x kops
+            sudo mv kops /usr/local/bin/kops
 
       - task: Bash@3
         displayName: Configure AWS Credentials
@@ -117,46 +192,16 @@ stages:
             aws configure set default.region $(AWS_REGION)
 
       - task: Bash@3
-        displayName: Provision KOps Cluster (Infrastructure)
+        displayName: Destroy KOps Cluster (Infrastructure)
         inputs:
           targetType: inline
           script: |
-            # Instalar kops
-            curl -Lo kops https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | grep tag_name | cut -d '"' -f 4)/kops-linux-amd64
-            chmod +x kops
-            sudo mv kops /usr/local/bin/kops
-
-            # Ejecutar el script idempotente de creación de cluster
-            chmod +x $(working_directory)/infrastructure/kops-cluster.sh
-            bash $(working_directory)/infrastructure/kops-cluster.sh
+            chmod +x $(working_directory)/infrastructure/kops-delete-cluster.sh
+            # Modificamos el script de delete temporalmente para no pedir interacción del prompt "y/N" en el CI/CD
+            sed -i 's/read -p "   ¿Quieres eliminar también el bucket S3 ($KOPS_STORAGE_BUCKET) y todo su contenido? \[y\/N\]: " delete_bucket/delete_bucket="y"/g' $(working_directory)/infrastructure/kops-delete-cluster.sh
+            
+            bash $(working_directory)/infrastructure/kops-delete-cluster.sh
         env:
           EKS_CLUSTER_NAME: $(EKS_CLUSTER_NAME)
           KOPS_STORAGE_BUCKET: $(KOPS_STORAGE_BUCKET)
           AWS_REGION: $(AWS_REGION)
-          AWS_ZONES: $(AWS_ZONES)
-
-      - task: Bash@3
-        displayName: Update kubeconfig via KOps
-        inputs:
-          targetType: inline
-          script: |
-            # Exportar el S3
-            kops export kubeconfig --admin --name $(EKS_CLUSTER_NAME) --state s3://$(KOPS_STORAGE_BUCKET)
-
-      - task: Bash@3
-        displayName: Deploy to Kubernetes (EKS - Manifestos)
-        inputs:
-          targetType: 'inline'
-          script: |
-            chmod +x $(working_directory)/scripts/deploy.sh
-            bash $(working_directory)/scripts/deploy.sh
-
-      # - task: Bash@3
-      #   displayName: Deploy Nginx with Helm
-      #   inputs:
-      #     targetType: inline
-      #     script: |
-      #       helm upgrade --install nginx $(working_directory)/helm \
-      #         -f $(working_directory)/helm/values-nginx.yaml \
-      #         --namespace default \
-      #         --create-namespace

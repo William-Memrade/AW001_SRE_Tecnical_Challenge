@@ -25,7 +25,7 @@ if kops get cluster --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKE
     python3 $(dirname "$0")/remove_kops_lb.py cluster-config-update.yaml
     
     kops replace -f cluster-config-update.yaml --state "s3://$KOPS_STORAGE_BUCKET" --force
-    kops update cluster --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" --yes
+    kops update cluster --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" --yes --admin
     
 else
     echo "=========================================="
@@ -44,7 +44,7 @@ else
         --zones "$AWS_ZONES" \
         --control-plane-size "t3.small" \
         --control-plane-volume-size 10 \
-        --node-size "t3.micro" \
+        --node-size "t3.small" \
         --node-count 1 \
         --node-volume-size 10 \
         --networking calico \
@@ -59,7 +59,7 @@ else
     
     echo "Aplicando configuración modificada..."
     kops replace -f cluster-config.yaml --state "s3://$KOPS_STORAGE_BUCKET" --force
-    kops update cluster --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" --yes
+    kops update cluster --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" --yes --admin
 fi
 
 echo "=============================================================================="
