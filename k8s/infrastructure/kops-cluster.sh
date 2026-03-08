@@ -7,10 +7,11 @@ set -e
 
 # Free Trail no me permitio configurar dominio con Route 53
 # Por lo que usamos un cluster basado en gossip (terminando el NAME en .k8s.local)
+export ZONES="${AWS_ZONES}"
+export AWS_REGION="${AWS_REGION}"
 export NAME="${EKS_CLUSTER_NAME}"
 export KOPS_STORAGE_BUCKET="${STORAGE_BUCKET}"
-export AWS_REGION="${AWS_REGION}"
-export ZONES="${AWS_ZONES}"
+export KOPS_STATE_STORE="s3://${KOPS_STORAGE_BUCKET}"
 
 # Validar si el bucket S3 ya existe
 if ! aws s3api head-bucket --bucket "$KOPS_STORAGE_BUCKET" 2>/dev/null; then
@@ -27,10 +28,10 @@ else
     echo "1. Bucket S3 $KOPS_STORAGE_BUCKET ya existe, omitiendo creación."
 fi
 
-export KOPS_STATE_STORE="s3://${KOPS_STORAGE_BUCKET}"
 
-echo "2. Crear la configuración del cluster (solo definición)"
+echo "2. Crear la configuración del cluster"
 if ! kops get cluster --name "${NAME}" --state="${KOPS_STATE_STORE}" > /dev/null 2>&1; then
+    echo "2.1 Generando manifiesto (dry-run) sin aplicar..."
     kops create cluster \
         --name=${NAME} \
         --state=${KOPS_STATE_STORE} \
@@ -39,11 +40,18 @@ if ! kops get cluster --name "${NAME}" --state="${KOPS_STATE_STORE}" > /dev/null
         --node-count=2 \
         --node-size=t2.micro \
         --topology=public \
-        --dns=private \
-        --yes
+        --dns=public \
+        --dry-run -o yaml > cluster-config.yaml
 else
-    echo "La configuración del cluster ${NAME} ya existe en KOps. Omitiendo creación."
+    echo "2.1 La configuración ya existe, exportándola para asegurar que el LoadBalancer está desactivado..."
+    kops get cluster --name "${NAME}" --state="${KOPS_STATE_STORE}" -o yaml > cluster-config.yaml
 fi
+
+echo "2.2 Eliminando dependencia del LoadBalancer en el API Server..."
+python3 $(dirname "$0")/remove_kops_lb.py cluster-config.yaml
+
+echo "2.3 Actualizando definición del clúster..."
+kops replace -f cluster-config.yaml --state=${KOPS_STATE_STORE} --force
 
 echo "3. Aplicar los cambios y crear físicamente los recursos en AWS"
 kops update cluster --name ${NAME} --yes --admin
