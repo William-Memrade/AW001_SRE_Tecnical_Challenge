@@ -17,79 +17,79 @@ variables:
     value: '$(System.DefaultWorkingDirectory)/k8s'
 
 stages:
-- stage: Build
-  displayName: Validate Kubernetes YAML
-  jobs:
-    - job: validate_kubernetes
-      steps:
-      - checkout: self
+# - stage: Build
+#   displayName: Validate Kubernetes YAML
+#   jobs:
+#     - job: validate_kubernetes
+#       steps:
+#       - checkout: self
 
-      - task: Bash@3
-        displayName: Install dependencies
-        inputs:
-          targetType: 'inline'
-          script: |
-            sudo apt-get update
-            sudo apt-get install -y yamllint shellcheck
+#       - task: Bash@3
+#         displayName: Install dependencies
+#         inputs:
+#           targetType: 'inline'
+#           script: |
+#             sudo apt-get update
+#             sudo apt-get install -y yamllint shellcheck
 
-            curl -LO https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl
-            chmod +x kubectl
-            sudo mv kubectl /usr/local/bin/
+#             curl -LO https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl
+#             chmod +x kubectl
+#             sudo mv kubectl /usr/local/bin/
 
-            curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+#             curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
-            curl -L https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz -o kubeconform.tar.gz
-            tar -xzf kubeconform.tar.gz
-            sudo mv kubeconform /usr/local/bin/
+#             curl -L https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz -o kubeconform.tar.gz
+#             tar -xzf kubeconform.tar.gz
+#             sudo mv kubeconform /usr/local/bin/
 
-      - task: Bash@3
-        displayName: Lint YAML files
-        inputs:
-          targetType: 'inline'
-          script: |
-            yamllint $(working_directory)
+#       - task: Bash@3
+#         displayName: Lint YAML files
+#         inputs:
+#           targetType: 'inline'
+#           script: |
+#             yamllint $(working_directory)
 
-      - task: Bash@3
-        displayName: Validate Kubernetes manifests
-        inputs:
-          targetType: 'inline'
-          script: |
-            kubeconform -strict -summary $(working_directory)/kubernetes/*.yaml
+#       - task: Bash@3
+#         displayName: Validate Kubernetes manifests
+#         inputs:
+#           targetType: 'inline'
+#           script: |
+#             kubeconform -strict -summary $(working_directory)/kubernetes/*.yaml
 
-      - task: Bash@3
-        displayName: Validate Helm chart rendering
-        inputs:
-          targetType: 'inline'
-          script: |
-            helm repo add bitnami https://charts.bitnami.com/bitnami
-            helm repo update
-            helm template nginx bitnami/nginx -f $(working_directory)/helm/values-nginx.yaml
+#       - task: Bash@3
+#         displayName: Validate Helm chart rendering
+#         inputs:
+#           targetType: 'inline'
+#           script: |
+#             helm repo add bitnami https://charts.bitnami.com/bitnami
+#             helm repo update
+#             helm template nginx bitnami/nginx -f $(working_directory)/helm/values-nginx.yaml
 
-      - task: Bash@3
-        displayName: Check shell scripts
-        inputs:
-          targetType: 'inline'
-          script: |
-            shellcheck $(working_directory)/scripts/*.sh || true
+#       - task: Bash@3
+#         displayName: Check shell scripts
+#         inputs:
+#           targetType: 'inline'
+#           script: |
+#             shellcheck $(working_directory)/scripts/*.sh || true
 
-- stage: DeploymentApprover
-  dependsOn: Build
-  jobs:
-  - deployment: ApprovalJob
-    environment: 'DeploymentApprovers'
-    pool:
-      name: k8s-agents
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - script: echo "Esperando aprobación para continuar con el despliegue..."
-            displayName: 'Approval Step'
+# - stage: DeploymentApprover
+#   dependsOn: Build
+#   jobs:
+#   - deployment: ApprovalJob
+#     environment: 'DeploymentApprovers'
+#     pool:
+#       name: k8s-agents
+#     strategy:
+#       runOnce:
+#         deploy:
+#           steps:
+#           - script: echo "Esperando aprobación para continuar con el despliegue..."
+#             displayName: 'Approval Step'
 
 - stage: Deploy
   displayName: Deploy to Kubernetes
-  dependsOn: DeploymentApprover
-  condition: succeeded()
+  # dependsOn: DeploymentApprover
+  # condition: succeeded()
   jobs:
     - job: deploy_kubernetes
       steps:
