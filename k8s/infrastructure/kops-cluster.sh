@@ -56,8 +56,8 @@ else
         --zones="${ZONES}" \
         --master-size=t2.micro \
         --master-volume-size=10 \
-        --node-count=2 \
         --node-size=t2.micro \
+        --node-count=2 \
         --node-volume-size=10 \
         --topology=public \
         --dns=public \
@@ -73,20 +73,13 @@ echo "==========================================================================
 
 n=0
 while [ $n -le 15 ]; do
+    # KOps moderno usa roles de IAM y la etiqueta "kops.k8s.io/instancegroup".
+    # Buscamos filtrando las instancias que correspondan a master o control-plane.
     MASTER_IP=$(aws ec2 describe-instances \
         --region "$AWS_REGION" \
-        --filters "Name=tag:KubernetesCluster,Values=$NAME" "Name=instance-state-name,Values=running" "Name=tag:k8s.io/role/control-plane,Values=1" \
+        --filters "Name=tag:KubernetesCluster,Values=$NAME" "Name=instance-state-name,Values=running" "Name=tag:kops.k8s.io/instancegroup,Values=master*,control-plane*" \
         --query "Reservations[*].Instances[*].PublicIpAddress" \
         --output text | awk '{print $1}')
-    
-    # Fallback por si en tu versión de kOps la etiqueta sigue siendo "master" en lugar de "control-plane"
-    if [ -z "$MASTER_IP" ] || [ "$MASTER_IP" == "None" ]; then
-        MASTER_IP=$(aws ec2 describe-instances \
-            --region "$AWS_REGION" \
-            --filters "Name=tag:KubernetesCluster,Values=$NAME" "Name=instance-state-name,Values=running" "Name=tag:k8s.io/role/master,Values=1" \
-            --query "Reservations[*].Instances[*].PublicIpAddress" \
-            --output text | awk '{print $1}')
-    fi
     
     if [ -n "$MASTER_IP" ] && [ "$MASTER_IP" != "None" ]; then
         echo "IP del Control Plane encontrada: $MASTER_IP"
@@ -94,6 +87,17 @@ while [ $n -le 15 ]; do
         sudo sed -i "/api\.$NAME/d" /etc/hosts || true
         # Agregar al hosts del runner para que resuelva localmente api.guillermo.k8s.local
         echo "$MASTER_IP api.$NAME" | sudo tee -a /etc/hosts
+        
+        # Opcional (pero muy recomendado en pipelines): Esperar a que la API responda
+        echo "Validando conexión a la API Kubernetes..."
+        for j in {1..30}; do
+          if curl -k -s https://api.$NAME/version > /dev/null; then
+             echo "¡API de Kubernetes responde en https://api.$NAME!"
+             break
+          fi
+          echo "La API aún no levanta, esperando 10s..."
+          sleep 10
+        done
         break
     else
         echo "Aún no hay IP pública asignada, reintentando en 10s..."
