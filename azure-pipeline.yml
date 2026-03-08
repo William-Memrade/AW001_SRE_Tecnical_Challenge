@@ -139,11 +139,26 @@ stages:
             aws configure set default.region $(AWS_REGION)
 
       - task: Bash@3
-        displayName: Update kubeconfig
+        displayName: Provision KOps Cluster (Infrastructure)
         inputs:
           targetType: inline
           script: |
-            aws eks update-kubeconfig --name $(EKS_CLUSTER_NAME) --region $(AWS_REGION)
+            # Instalar kops
+            curl -Lo kops https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | grep tag_name | cut -d '"' -f 4)/kops-linux-amd64
+            chmod +x kops
+            sudo mv kops /usr/local/bin/kops
+
+            # Ejecutar el script idempotente de creación de cluster
+            chmod +x $(working_directory)/infrastructure/kops-cluster.sh
+            bash $(working_directory)/infrastructure/kops-cluster.sh
+
+      - task: Bash@3
+        displayName: Update kubeconfig via KOps
+        inputs:
+          targetType: inline
+          script: |
+            # Exportar el S3
+            kops export kubeconfig --admin --name $(EKS_CLUSTER_NAME) --state $(STORAGE_BUCKET)
 
       - task: Bash@3
         displayName: Deploy to Kubernetes (EKS - Manifestos)
