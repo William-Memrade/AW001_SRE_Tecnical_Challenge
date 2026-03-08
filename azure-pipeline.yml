@@ -17,185 +17,185 @@ variables:
     value: '$(System.DefaultWorkingDirectory)/k8s'
 
 stages:
-- stage: Build
-  displayName: Validate Kubernetes YAML
-  jobs:
-    - job: validate_kubernetes
-      steps:
-      - checkout: self
+# - stage: Build
+#   displayName: Validate Kubernetes YAML
+#   jobs:
+#     - job: validate_kubernetes
+#       steps:
+#       - checkout: self
 
-      - task: Bash@3
-        displayName: Install dependencies
-        inputs:
-          targetType: 'inline'
-          script: |
-            sudo yum update -y
-            sudo yum install -y yamllint ShellCheck
+#       - task: Bash@3
+#         displayName: Install dependencies
+#         inputs:
+#           targetType: 'inline'
+#           script: |
+#             sudo yum update -y
+#             sudo yum install -y yamllint ShellCheck
 
-            curl -LO https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl
-            chmod +x kubectl
-            sudo mv kubectl /usr/local/bin/
+#             curl -LO https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl
+#             chmod +x kubectl
+#             sudo mv kubectl /usr/local/bin/
 
-            curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+#             curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
-            curl -L https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz -o kubeconform.tar.gz
-            tar -xzf kubeconform.tar.gz
-            sudo mv kubeconform /usr/local/bin/
+#             curl -L https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz -o kubeconform.tar.gz
+#             tar -xzf kubeconform.tar.gz
+#             sudo mv kubeconform /usr/local/bin/
 
-      - task: Bash@3
-        displayName: Lint YAML files
-        inputs:
-          targetType: 'inline'
-          script: |
-            yamllint $(working_directory)
+#       - task: Bash@3
+#         displayName: Lint YAML files
+#         inputs:
+#           targetType: 'inline'
+#           script: |
+#             yamllint $(working_directory)
 
-      - task: Bash@3
-        displayName: Validate Kubernetes manifests
-        inputs:
-          targetType: 'inline'
-          script: |
-            kubeconform -strict -summary $(working_directory)/kubernetes/*.yaml
+#       - task: Bash@3
+#         displayName: Validate Kubernetes manifests
+#         inputs:
+#           targetType: 'inline'
+#           script: |
+#             kubeconform -strict -summary $(working_directory)/kubernetes/*.yaml
 
-      - task: Bash@3
-        displayName: Validate Helm chart rendering
-        inputs:
-          targetType: 'inline'
-          script: |
-            helm repo add bitnami https://charts.bitnami.com/bitnami
-            helm repo update
-            helm template nginx bitnami/nginx -f $(working_directory)/helm/values-nginx.yaml
+#       - task: Bash@3
+#         displayName: Validate Helm chart rendering
+#         inputs:
+#           targetType: 'inline'
+#           script: |
+#             helm repo add bitnami https://charts.bitnami.com/bitnami
+#             helm repo update
+#             helm template nginx bitnami/nginx -f $(working_directory)/helm/values-nginx.yaml
 
-      - task: Bash@3
-        displayName: Check shell scripts
-        inputs:
-          targetType: 'inline'
-          script: |
-            shellcheck $(working_directory)/scripts/*.sh || true
+#       - task: Bash@3
+#         displayName: Check shell scripts
+#         inputs:
+#           targetType: 'inline'
+#           script: |
+#             shellcheck $(working_directory)/scripts/*.sh || true
 
-- stage: DeploymentApproval
-  dependsOn: Build
-  jobs:
-  - deployment: ApprovalJob
-    environment: 'DeploymentApprovers'
-    pool:
-      name: k8s-agents
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - script: echo "Esperando aprobación para continuar con el despliegue..."
-            displayName: 'Approval Step'
+# - stage: DeploymentApproval
+#   dependsOn: Build
+#   jobs:
+#   - deployment: ApprovalJob
+#     environment: 'DeploymentApprovers'
+#     pool:
+#       name: k8s-agents
+#     strategy:
+#       runOnce:
+#         deploy:
+#           steps:
+#           - script: echo "Esperando aprobación para continuar con el despliegue..."
+#             displayName: 'Approval Step'
 
-- stage: Deploy
-  displayName: Deploy to Kubernetes
-  dependsOn: DeploymentApproval
-  condition: succeeded()
-  jobs:
-    - job: deploy_kubernetes
-      steps:
-      - task: Bash@3
-        displayName: Install dependencies
-        inputs:
-          targetType: 'inline'
-          script: |
-            sudo yum update -y
-            sudo yum install -y awscli
+# - stage: Deploy
+#   displayName: Deploy to Kubernetes
+#   dependsOn: DeploymentApproval
+#   condition: succeeded()
+#   jobs:
+#     - job: deploy_kubernetes
+#       steps:
+#       - task: Bash@3
+#         displayName: Install dependencies
+#         inputs:
+#           targetType: 'inline'
+#           script: |
+#             sudo yum update -y
+#             sudo yum install -y awscli
 
-            curl -LO https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl
-            chmod +x kubectl
-            sudo mv kubectl /usr/local/bin/
+#             curl -LO https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl
+#             chmod +x kubectl
+#             sudo mv kubectl /usr/local/bin/
 
-            curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+#             curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
-      - task: Bash@3
-        displayName: Configure AWS Credentials
-        inputs:
-          targetType: inline
-          script: |
-            aws configure set aws_access_key_id $(AWS_ACCESS_KEY_ID)
-            aws configure set aws_secret_access_key $(AWS_SECRET_ACCESS_KEY)
-            aws configure set default.region $(AWS_REGION)
+#       - task: Bash@3
+#         displayName: Configure AWS Credentials
+#         inputs:
+#           targetType: inline
+#           script: |
+#             aws configure set aws_access_key_id $(AWS_ACCESS_KEY_ID)
+#             aws configure set aws_secret_access_key $(AWS_SECRET_ACCESS_KEY)
+#             aws configure set default.region $(AWS_REGION)
 
-      - task: Bash@3
-        displayName: Provision KOps Cluster (Infrastructure)
-        inputs:
-          targetType: inline
-          script: |
-            # Instalar kops
-            curl -Lo kops https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | grep tag_name | cut -d '"' -f 4)/kops-linux-amd64
-            chmod +x kops
-            sudo mv kops /usr/local/bin/kops
+#       - task: Bash@3
+#         displayName: Provision KOps Cluster (Infrastructure)
+#         inputs:
+#           targetType: inline
+#           script: |
+#             # Instalar kops
+#             curl -Lo kops https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | grep tag_name | cut -d '"' -f 4)/kops-linux-amd64
+#             chmod +x kops
+#             sudo mv kops /usr/local/bin/kops
 
-            # Ejecutar el script idempotente de creación de cluster
-            chmod +x $(working_directory)/infrastructure/kops-cluster.sh
-            bash $(working_directory)/infrastructure/kops-cluster.sh
-        env:
-          EKS_CLUSTER_NAME: $(EKS_CLUSTER_NAME)
-          KOPS_STORAGE_BUCKET: $(KOPS_STORAGE_BUCKET)
-          AWS_REGION: $(AWS_REGION)
-          AWS_ZONES: $(AWS_ZONES)
+#             # Ejecutar el script idempotente de creación de cluster
+#             chmod +x $(working_directory)/infrastructure/kops-cluster.sh
+#             bash $(working_directory)/infrastructure/kops-cluster.sh
+#         env:
+#           EKS_CLUSTER_NAME: $(EKS_CLUSTER_NAME)
+#           KOPS_STORAGE_BUCKET: $(KOPS_STORAGE_BUCKET)
+#           AWS_REGION: $(AWS_REGION)
+#           AWS_ZONES: $(AWS_ZONES)
 
-      - task: Bash@3
-        displayName: Update kubeconfig via KOps
-        inputs:
-          targetType: inline
-          script: |
-            # Exportar el S3
-            kops export kubeconfig --admin --name $(EKS_CLUSTER_NAME) --state s3://$(KOPS_STORAGE_BUCKET)
+#       - task: Bash@3
+#         displayName: Update kubeconfig via KOps
+#         inputs:
+#           targetType: inline
+#           script: |
+#             # Exportar el S3
+#             kops export kubeconfig --admin --name $(EKS_CLUSTER_NAME) --state s3://$(KOPS_STORAGE_BUCKET)
 
-      - task: Bash@3
-        displayName: Deploy to Kubernetes (EKS - Manifestos)
-        inputs:
-          targetType: 'inline'
-          script: |
-            chmod +x $(working_directory)/scripts/deploy.sh
-            bash $(working_directory)/scripts/deploy.sh
+#       - task: Bash@3
+#         displayName: Deploy to Kubernetes (EKS - Manifestos)
+#         inputs:
+#           targetType: 'inline'
+#           script: |
+#             chmod +x $(working_directory)/scripts/deploy.sh
+#             bash $(working_directory)/scripts/deploy.sh
 
-      - task: Bash@3
-        displayName: Deploy Nginx with Helm
-        inputs:
-          targetType: inline
-          script: |
-            helm upgrade --install nginx oci://registry-1.docker.io/bitnamicharts/nginx \
-              -f $(working_directory)/helm/values-nginx.yaml \
-              --namespace default \
-              --create-namespace
+#       - task: Bash@3
+#         displayName: Deploy Nginx with Helm
+#         inputs:
+#           targetType: inline
+#           script: |
+#             helm upgrade --install nginx oci://registry-1.docker.io/bitnamicharts/nginx \
+#               -f $(working_directory)/helm/values-nginx.yaml \
+#               --namespace default \
+#               --create-namespace
 
-      - task: Bash@3
-        displayName: Print Public URLs
-        inputs:
-          targetType: inline
-          script: |
-            echo "=============================================================================="
-            echo "🎉 DESPLIEGUES FINALIZADOS CON ÉXITO 🎉"
-            echo "=============================================================================="
-            echo "Extrayendo URLs públicas de AWS Elastic Load Balancer..."
+#       - task: Bash@3
+#         displayName: Print Public URLs
+#         inputs:
+#           targetType: inline
+#           script: |
+#             echo "=============================================================================="
+#             echo "🎉 DESPLIEGUES FINALIZADOS CON ÉXITO 🎉"
+#             echo "=============================================================================="
+#             echo "Extrayendo URLs públicas de AWS Elastic Load Balancer..."
             
-            echo "🌐 URL 1: Nginx (Manifiestos manuales / ConfigMap propio)"
-            MANIFEST_URL=$(kubectl get svc nginx-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-            echo "-> http://$MANIFEST_URL"
+#             echo "🌐 URL 1: Nginx (Manifiestos manuales / ConfigMap propio)"
+#             MANIFEST_URL=$(kubectl get svc nginx-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+#             echo "-> http://$MANIFEST_URL"
             
-            echo "🌐 URL 2: Nginx (Helm Chart)"
-            HELM_URL=$(kubectl get svc nginx -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-            echo "-> http://$HELM_URL"
-            echo "=============================================================================="
+#             echo "🌐 URL 2: Nginx (Helm Chart)"
+#             HELM_URL=$(kubectl get svc nginx -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+#             echo "-> http://$HELM_URL"
+#             echo "=============================================================================="
 
-- stage: DeploymentDestroy
-  dependsOn: Deploy
-  jobs:
-  - deployment: ApprovalJob
-    environment: 'DeploymentApprovers'
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - script: echo "Esperando aprobación para continuar con el destroy..."
-            displayName: 'Approval Step'
+# - stage: DeploymentDestroy
+#   dependsOn: Deploy
+#   jobs:
+#   - deployment: ApprovalJob
+#     environment: 'DeploymentApprovers'
+#     strategy:
+#       runOnce:
+#         deploy:
+#           steps:
+#           - script: echo "Esperando aprobación para continuar con el destroy..."
+#             displayName: 'Approval Step'
 
 - stage: Destroy
   displayName: Destroy Kubernetes Cluster
-  dependsOn: DeploymentDestroy
-  condition: succeeded()
+  # dependsOn: DeploymentDestroy
+  # condition: succeeded()
   jobs:
     - job: destroy_kubernetes
       displayName: Destroy KOps Cluster
