@@ -18,8 +18,15 @@ if kops get cluster --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKE
     echo "El clúster ya existe. Ejecutando UPDATE..."
     echo "=========================================="
     
+    # Igual que en creation, debemos forzar a KOps a olvidar el NLB (AWS Free Tier) antes de actualizar
+    kops get cluster --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" -o yaml > cluster-config-update.yaml
+    
+    pip3 install pyyaml || true
+    python3 $(dirname "$0")/remove_kops_lb.py cluster-config-update.yaml
+    
+    kops replace -f cluster-config-update.yaml --state "s3://$KOPS_STORAGE_BUCKET" --force
     kops update cluster --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" --yes
-
+    
 else
     echo "=========================================="
     echo "El clúster NO existe. Ejecutando CREATE..."
