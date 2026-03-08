@@ -2,7 +2,7 @@
 set -euo pipefail
 
 echo "=============================================================================="
-echo " AWS - Gestionando el cluster: $CLUSTER_NAME"
+echo " AWS - Gestionando el cluster: $EKS_CLUSTER_NAME"
 echo "=============================================================================="
 
 # 1. Validar si existe el Bucket para no fallar
@@ -13,12 +13,12 @@ if ! aws s3api head-bucket --bucket "${KOPS_STORAGE_BUCKET}" 2>/dev/null; then
 fi
 
 # 2. Validar si el clúster ya existe
-if kops get cluster --name "$CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" > /dev/null 2>&1; then
+if kops get cluster --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" > /dev/null 2>&1; then
     echo "=========================================="
     echo "El clúster ya existe. Ejecutando UPDATE..."
     echo "=========================================="
     
-    kops update cluster --name "$CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" --yes
+    kops update cluster --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" --yes
 
 else
     echo "=========================================="
@@ -28,7 +28,7 @@ else
     # Hemos agregado la restricción de los 10GB de master/nodes para Free Tier 
     # y adaptado tu template. 
     kops create cluster \
-        --name "$CLUSTER_NAME" \
+        --name "$EKS_CLUSTER_NAME" \
         --state "s3://$KOPS_STORAGE_BUCKET" \
         --zones "$AWS_ZONES" \
         --control-plane-size "t2.micro" \
@@ -44,10 +44,10 @@ else
 fi
 
 echo "Esperando validación completa de KOps (esto tardará unos minutos)..."
-kops validate cluster --name "$CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" --wait 15m
+kops validate cluster --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" --wait 15m
 
 echo "Exportando kubeconfig..."
-kops export kubeconfig --name "$CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" --admin
+kops export kubeconfig --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" --admin
 
 echo "Validando nodos..."
 kubectl get nodes -o wide
