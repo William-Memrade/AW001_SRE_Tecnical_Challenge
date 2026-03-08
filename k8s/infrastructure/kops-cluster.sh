@@ -27,14 +27,16 @@ else
     
     # Hemos agregado la restricción de los 10GB de master/nodes para Free Tier 
     # y adaptado tu template. 
+    # Modificado a instancias t3.small para master (Kubernetes moderno demanda ~2GB RAM para API)
+    # y t3.micro para el worker node, reduciendo a 1 solo nodo para no agotar la Free Tier.
     kops create cluster \
         --name "$EKS_CLUSTER_NAME" \
         --state "s3://$KOPS_STORAGE_BUCKET" \
         --zones "$AWS_ZONES" \
-        --control-plane-size "t2.micro" \
+        --control-plane-size "t3.small" \
         --master-volume-size 10 \
-        --node-size "t2.micro" \
-        --node-count 2 \
+        --node-size "t3.micro" \
+        --node-count 1 \
         --node-volume-size 10 \
         --networking calico \
         --container-runtime containerd \
