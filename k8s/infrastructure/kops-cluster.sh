@@ -36,7 +36,8 @@ kops create cluster \
     --node-size=t2.micro \
     --master-size=t2.micro \
     --topology=public \
-    --dns=private
+    --dns=private \
+    --api-loadbalancer-class=classic
 
 echo "3. Aplicar los cambios y crear físicamente los recursos en AWS"
 kops update cluster --name ${NAME} --yes --admin
