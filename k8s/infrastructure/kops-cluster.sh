@@ -73,15 +73,26 @@ echo "==========================================================================
 
 n=0
 while [ $n -le 15 ]; do
-    # KOps moderno usa roles de IAM y la etiqueta "kops.k8s.io/instancegroup".
-    # Buscamos filtrando las instancias que correspondan a master o control-plane.
-    MASTER_IP=$(aws ec2 describe-instances \
-        --region "$AWS_REGION" \
-        --filters "Name=tag:KubernetesCluster,Values=$NAME" "Name=instance-state-name,Values=running" "Name=tag:kops.k8s.io/instancegroup,Values=master*,control-plane*" \
-        --query "Reservations[*].Instances[*].PublicIpAddress" \
-        --output text | awk '{print $1}')
+    # ¡NUEVO ENFOQUE! KOps SIEMPRE etiqueta los Security Groups del Master de manera estándar.
+    # Vamos a buscar cualquier instancia corriendo que pertenezca al Security Group del Master
+    # de este cluster, lo que evita depender de etiquetas impredecibles en las propias EC2.
     
-    if [ -n "$MASTER_IP" ] && [ "$MASTER_IP" != "None" ]; then
+    # Conseguir el ID del Security Group del Master
+    SG_MASTER_ID=$(aws ec2 describe-security-groups \
+        --region "$AWS_REGION" \
+        --filters "Name=group-name,Values=masters.$NAME" \
+        --query "SecurityGroups[0].GroupId" --output text)
+        
+    if [ "$SG_MASTER_ID" != "None" ] && [ -n "$SG_MASTER_ID" ]; then
+        # Buscar la IP de cualquier instancia usando ese Security Group
+        MASTER_IP=$(aws ec2 describe-instances \
+            --region "$AWS_REGION" \
+            --filters "Name=instance.group-id,Values=$SG_MASTER_ID" "Name=instance-state-name,Values=running" \
+            --query "Reservations[*].Instances[*].PublicIpAddress" \
+            --output text | awk '{print $1}')
+    fi
+    
+    if [ -n "${MASTER_IP:-}" ] && [ "$MASTER_IP" != "None" ]; then
         echo "IP del Control Plane encontrada: $MASTER_IP"
         # Limpiar entradas antiguas en hosts por seguridad en el mismo runner
         sudo sed -i "/api\.$NAME/d" /etc/hosts || true
