@@ -17,7 +17,7 @@ variables:
     value: '$(System.DefaultWorkingDirectory)/k8s'
 
 stages:
-- stage: Validate
+- stage: Build
   displayName: Validate Kubernetes YAML
   jobs:
     - job: validate_kubernetes
@@ -86,3 +86,79 @@ stages:
           targetPath: '$(working_directory)'
           artifactName: 'k8s-manifests'
           publishLocation: 'pipeline'
+
+- stage: DeploymentApprover
+  dependsOn: Build
+  jobs:
+  - deployment: ApprovalJob
+    environment: 'DeploymentApprovers'
+    pool:
+      name: k8s-agents
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - script: echo "Esperando aprobación para continuar con el despliegue..."
+            displayName: 'Approval Step'
+
+- stage: Deploy
+  displayName: Deploy to Kubernetes
+  dependsOn: DeploymentApprover
+  condition: succeeded()
+  jobs:
+    - job: deploy_kubernetes
+      steps:
+      - task: DownloadPipelineArtifact@2
+        displayName: 'Download Kubernetes Manifests Artifact'
+        inputs:
+          buildType: 'current'
+          artifactName: 'k8s-manifests'
+          targetPath: '$(working_directory)'
+
+      - task: Bash@3
+        displayName: Install dependencies
+        inputs:
+          targetType: 'inline'
+          script: |
+            sudo apt-get update
+            sudo apt-get install -y awscli
+
+            curl -LO https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl
+            chmod +x kubectl
+            sudo mv kubectl /usr/local/bin/
+
+            curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+      - task: Bash@3
+        displayName: Configure AWS Credentials
+        inputs:
+          targetType: inline
+          script: |
+            aws configure set aws_access_key_id $(AWS_ACCESS_KEY_ID)
+            aws configure set aws_secret_access_key $(AWS_SECRET_ACCESS_KEY)
+            aws configure set default.region $(AWS_REGION)
+
+      - task: Bash@3
+        displayName: Update kubeconfig
+        inputs:
+          targetType: inline
+          script: |
+            aws eks update-kubeconfig --name $(EKS_CLUSTER_NAME) --region $(AWS_REGION)
+
+      - task: Bash@3
+        displayName: Deploy to Kubernetes (EKS - Manifestos)
+        inputs:
+          targetType: 'inline'
+          script: |
+            chmod +x $(working_directory)/scripts/deploy.sh
+            bash $(working_directory)/scripts/deploy.sh
+
+      # - task: Bash@3
+      #   displayName: Deploy Nginx with Helm
+      #   inputs:
+      #     targetType: inline
+      #     script: |
+      #       helm upgrade --install nginx $(working_directory)/helm \
+      #         -f $(working_directory)/helm/values-nginx.yaml \
+      #         --namespace default \
+      #         --create-namespace
