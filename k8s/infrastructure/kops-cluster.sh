@@ -34,7 +34,7 @@ kops create cluster \
     --zones=${ZONES} \
     --node-count=2 \
     --node-size=t2.micro \
-    --master-size=t2.micro \
+    --control-plane-size=t2.micro \
     --topology=public \
     --dns=private \
     --api-loadbalancer-class=classic
