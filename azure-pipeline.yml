@@ -173,11 +173,21 @@ stages:
             echo "Extrayendo URLs públicas de AWS Elastic Load Balancer..."
             
             echo "🌐 URL 1: Nginx (Manifiestos manuales / ConfigMap propio)"
-            MANIFEST_URL=$(kubectl get svc nginx-service -n memrade-frontend -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            MANIFEST_URL=""
+            while [ -z "$MANIFEST_URL" ]; do
+              echo "Esperando a que AWS asigne el DNS para Nginx Manual... (esto puede tardar 2-3 min)"
+              sleep 10
+              MANIFEST_URL=$(kubectl get svc nginx-service -n memrade-frontend -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            done
             echo "-> http://$MANIFEST_URL"
             
             echo "🌐 URL 2: Nginx (Helm Chart)"
-            HELM_URL=$(kubectl get svc nginx -n memrade-frontend -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            HELM_URL=""
+            while [ -z "$HELM_URL" ]; do
+              echo "Esperando a que AWS asigne el DNS para Nginx Helm... (esto puede tardar 2-3 min)"
+              sleep 10
+              HELM_URL=$(kubectl get svc nginx -n memrade-frontend -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            done
             echo "-> http://$HELM_URL"
             echo "=============================================================================="
 
