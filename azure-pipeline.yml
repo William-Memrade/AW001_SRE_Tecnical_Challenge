@@ -30,7 +30,8 @@ stages:
           targetType: 'inline'
           script: |
             sudo yum update -y
-            sudo yum install -y yamllint ShellCheck
+            sudo yum install -y python3-pip
+            pip3 install yamllint --user
 
             curl -LO https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl
             chmod +x kubectl
@@ -65,12 +66,12 @@ stages:
             helm repo update
             helm template nginx bitnami/nginx -f $(working_directory)/helm/values-nginx.yaml
 
-      - task: Bash@3
-        displayName: Check shell scripts
-        inputs:
-          targetType: 'inline'
-          script: |
-            shellcheck $(working_directory)/scripts/*.sh || true
+#      - task: Bash@3
+#        displayName: Check shell scripts
+#        inputs:
+#          targetType: 'inline'
+#          script: |
+#            shellcheck $(working_directory)/scripts/*.sh || true
 
 - stage: DeploymentApproval
   dependsOn: Build
