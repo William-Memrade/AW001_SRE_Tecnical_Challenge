@@ -29,8 +29,8 @@ stages:
         inputs:
           targetType: 'inline'
           script: |
-            sudo apt-get update -y
-            sudo apt-get install -y yamllint ShellCheck
+            sudo yum update -y
+            sudo yum install -y yamllint ShellCheck
 
             curl -LO https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl
             chmod +x kubectl
@@ -98,8 +98,8 @@ stages:
         inputs:
           targetType: 'inline'
           script: |
-            sudo apt-get update
-            sudo apt-get install -y awscli
+            sudo yum update
+            sudo yum install -y awscli
 
             curl -LO https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl
             chmod +x kubectl
@@ -203,8 +203,8 @@ stages:
         inputs:
           targetType: 'inline'
           script: |
-            sudo apt-get update -y
-            sudo apt-get install -y awscli
+            sudo yum update -y
+            sudo yum install -y awscli
 
             curl -LO https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl
             chmod +x kubectl
