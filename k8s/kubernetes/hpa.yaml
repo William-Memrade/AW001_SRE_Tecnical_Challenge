@@ -3,6 +3,7 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: nginx-hpa
+  namespace: memrade-frontend
 spec:
   scaleTargetRef:
     apiVersion: apps/v1

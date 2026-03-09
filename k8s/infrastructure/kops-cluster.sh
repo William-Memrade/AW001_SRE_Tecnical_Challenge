@@ -18,7 +18,6 @@ if kops get cluster --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKE
     echo "El clúster ya existe. Ejecutando UPDATE..."
     echo "=========================================="
     
-    # Igual que en creation, debemos forzar a KOps a olvidar el NLB (AWS Free Tier) antes de actualizar
     kops get cluster --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" -o yaml > cluster-config-update.yaml
     
     pip3 install pyyaml || true
@@ -26,18 +25,12 @@ if kops get cluster --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKE
     
     kops replace -f cluster-config-update.yaml --state "s3://$KOPS_STORAGE_BUCKET" --force
     kops update cluster --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" --yes --admin
-    
+
 else
     echo "=========================================="
     echo "El clúster NO existe. Ejecutando CREATE..."
     echo "=========================================="
-    
-    # Hemos agregado la restricción de los 10GB de master/nodes para Free Tier 
-    # y adaptado tu template. 
-    # Modificado a instancias t3.small para master (Kubernetes moderno demanda ~2GB RAM para API)
-    # y t3.micro para el worker node, reduciendo a 1 solo nodo para no agotar la Free Tier.
-    # En cuenta Free Tier, AWS rechaza los LoadBalancers. Por tanto aplicamos primero en DRy RUN
-    # Removemos la configuración del LoadBalancer con Python y luego reemplazamos
+
     kops create cluster \
         --name "$EKS_CLUSTER_NAME" \
         --state "s3://$KOPS_STORAGE_BUCKET" \
@@ -51,12 +44,12 @@ else
         --topology public \
         --dns public \
         --dry-run -o yaml > cluster-config.yaml
-        
+
     echo "Removiendo el NLB del API Server para AWS Free Tier..."
-    # Primero necesitamos instalar PyYAML temporalmente para el script de parche
+
     pip3 install pyyaml || true
     python3 $(dirname "$0")/remove_kops_lb.py cluster-config.yaml
-    
+
     echo "Aplicando configuración modificada..."
     kops replace -f cluster-config.yaml --state "s3://$KOPS_STORAGE_BUCKET" --force
     kops update cluster --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" --yes --admin
