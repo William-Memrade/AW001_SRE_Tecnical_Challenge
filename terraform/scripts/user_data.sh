@@ -12,8 +12,9 @@ echo "security_user ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/security_user
 
 # 2. Actualización completa del sistema
 export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a
 apt-get update -y
-apt-get upgrade -y
+apt-get upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
 
 # 3. Instalar y habilitar NTP (chrony) para sincronización de tiempo
 apt-get install -y chrony
