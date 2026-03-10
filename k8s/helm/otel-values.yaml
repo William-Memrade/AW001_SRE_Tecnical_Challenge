@@ -6,6 +6,13 @@ image:
   pullPolicy: IfNotPresent
   tag: "0.95.0"
 
+resources:
+  limits:
+    memory: "512Mi"
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+
 config:
   receivers:
     otlp:

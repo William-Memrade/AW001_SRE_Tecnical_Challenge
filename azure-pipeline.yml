@@ -295,8 +295,6 @@ stages:
           targetType: inline
           script: |
             chmod +x $(working_directory)/infrastructure/kops-delete-cluster.sh
-            sed -i 's/read -p "   ¿Quieres eliminar también el bucket S3 ($KOPS_STORAGE_BUCKET) y todo su contenido? \[y\/N\]: " delete_bucket/delete_bucket="y"/g' $(working_directory)/infrastructure/kops-delete-cluster.sh
-
             bash $(working_directory)/infrastructure/kops-delete-cluster.sh
         env:
           EKS_CLUSTER_NAME: $(EKS_CLUSTER_NAME)

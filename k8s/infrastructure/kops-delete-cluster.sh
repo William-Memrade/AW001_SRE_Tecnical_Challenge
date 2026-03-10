@@ -24,31 +24,25 @@ fi
 echo "2. Revisando bucket S3 del estado de KOps..."
 if aws s3api head-bucket --bucket "$KOPS_STORAGE_BUCKET" 2>/dev/null; then
     echo "   Se encontró el bucket S3: $KOPS_STORAGE_BUCKET"
+    echo "   Procediendo a eliminar el bucket S3 ($KOPS_STORAGE_BUCKET) y todo su contenido..."
+    echo "   Vaciando el bucket (incluyendo versiones si las hay)..."
     
-    read -p "   ¿Quieres eliminar también el bucket S3 ($KOPS_STORAGE_BUCKET) y todo su contenido? [y/N]: " delete_bucket
+    aws s3api delete-objects \
+        --bucket $KOPS_STORAGE_BUCKET \
+        --delete "$(aws s3api list-object-versions \
+            --bucket $KOPS_STORAGE_BUCKET \
+            --output=json \
+            --query='{Objects: Versions[].{Key:Key,VersionId:VersionId}}')" || true
     
-    if [[ "$delete_bucket" =~ ^[Yy]$ ]]; then
-        echo "   Vaciando el bucket (incluyendo versiones si las hay)..."
-        
-        aws s3api delete-objects \
+    aws s3api delete-objects \
+        --bucket $KOPS_STORAGE_BUCKET \
+        --delete "$(aws s3api list-object-versions \
             --bucket $KOPS_STORAGE_BUCKET \
-            --delete "$(aws s3api list-object-versions \
-                --bucket $KOPS_STORAGE_BUCKET \
-                --output=json \
-                --query='{Objects: Versions[].{Key:Key,VersionId:VersionId}}')" || true
-        
-        aws s3api delete-objects \
-            --bucket $KOPS_STORAGE_BUCKET \
-            --delete "$(aws s3api list-object-versions \
-                --bucket $KOPS_STORAGE_BUCKET \
-                --output=json \
-                --query='{Objects: DeleteMarkers[].{Key:Key,VersionId:VersionId}}')" || true
+            --output=json \
+            --query='{Objects: DeleteMarkers[].{Key:Key,VersionId:VersionId}}')" || true
 
-        aws s3 rb s3://$KOPS_STORAGE_BUCKET --force
-        echo "   Bucket S3 eliminado correctamente."
-    else
-        echo "   El bucket S3 se mantendrá intacto."
-    fi
+    aws s3 rb s3://$KOPS_STORAGE_BUCKET --force
+    echo "   Bucket S3 eliminado correctamente."
 else
     echo "   El bucket S3 ya no existe o no hay acceso."
 fi
