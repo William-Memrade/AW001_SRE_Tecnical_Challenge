@@ -310,5 +310,5 @@ stages:
           workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
           script: |
             /usr/local/bin/terraform init
-            /usr/local/bin/terraform plan -out=tfplan
-            /usr/local/bin/terraform destroy -auto-approve
+            /usr/local/bin/terraform plan -destroy -out=tfdestroyplan
+            /usr/local/bin/terraform apply -destroy -auto-approve tfdestroyplan
