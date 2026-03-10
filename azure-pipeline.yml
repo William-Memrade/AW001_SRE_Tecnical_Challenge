@@ -84,10 +84,10 @@ stages:
         displayName: Validate Terraform code
         inputs:
           targetType: 'inline'
+          workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
           script: |
-            cd $(System.DefaultWorkingDirectory)/terraform
-            terraform init -backend=false
-            terraform validate
+            /usr/local/bin/terraform init -backend=false
+            /usr/local/bin/terraform validate
 
 - stage: Deploy
   displayName: Deploy Infrastructure
@@ -171,18 +171,18 @@ stages:
         displayName: Planning Terraform Infrastructure
         inputs:
           targetType: inline
+          workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
           script: |
-            cd $(System.DefaultWorkingDirectory)/terraform
-            terraform init
-            terraform plan -out=tfplan
+            /usr/local/bin/terraform init
+            /usr/local/bin/terraform plan -out=tfplan
 
       - task: Bash@3
         displayName: Deploy Terraform Infrastructure
         inputs:
           targetType: inline
+          workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
           script: |
-            cd $(System.DefaultWorkingDirectory)/terraform
-            terraform apply -auto-approve tfplan
+            /usr/local/bin/terraform apply -auto-approve tfplan
 
       - task: Bash@3
         displayName: Print Public URLs
@@ -214,7 +214,7 @@ stages:
             
             echo "🌐 URL 3: Terraform ALB"
             cd $(System.DefaultWorkingDirectory)/terraform
-            TF_ALB_URL=$(terraform output -raw alb_dns_name)
+            TF_ALB_URL=$(/usr/local/bin/terraform output -raw alb_dns_name)
             echo "-> http://$TF_ALB_URL"
             echo "=============================================================================="
 
@@ -308,7 +308,7 @@ stages:
         displayName: Destroy Terraform Infrastructure
         inputs:
           targetType: inline
+          workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
           script: |
-            cd $(System.DefaultWorkingDirectory)/terraform
-            terraform init
-            terraform destroy -auto-approve
+            /usr/local/bin/terraform init
+            /usr/local/bin/terraform destroy -auto-approve
