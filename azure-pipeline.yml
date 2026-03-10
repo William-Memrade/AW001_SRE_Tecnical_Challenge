@@ -304,6 +304,23 @@ stages:
           AWS_REGION: $(AWS_REGION)
 
       - task: Bash@3
+        displayName: Planning Terraform Infrastructure
+        inputs:
+          targetType: inline
+          workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+          script: |
+            /usr/local/bin/terraform init
+            /usr/local/bin/terraform plan -out=tfplan
+
+      - task: Bash@3
+        displayName: Deploy Terraform Infrastructure
+        inputs:
+          targetType: inline
+          workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+          script: |
+            /usr/local/bin/terraform apply -auto-approve tfplan
+
+      - task: Bash@3
         displayName: Destroy Terraform Infrastructure
         inputs:
           targetType: inline
