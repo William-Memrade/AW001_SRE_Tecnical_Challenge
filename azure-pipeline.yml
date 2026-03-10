@@ -50,6 +50,7 @@ stages:
             sudo yum install -y unzip
             curl -fsSL https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip -o /tmp/terraform.zip
             cd /tmp && unzip -q -o terraform.zip
+            sudo rm -rf /usr/local/bin/terraform
             sudo mv /tmp/terraform /usr/local/bin/terraform
 
       - task: Bash@3
@@ -113,6 +114,7 @@ stages:
             sudo yum install -y unzip
             curl -fsSL https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip -o /tmp/terraform.zip
             cd /tmp && unzip -q -o terraform.zip
+            sudo rm -rf /usr/local/bin/terraform
             sudo mv /tmp/terraform /usr/local/bin/terraform
 
       - task: Bash@3
@@ -260,6 +262,7 @@ stages:
             sudo yum install -y unzip
             curl -fsSL https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip -o /tmp/terraform.zip
             cd /tmp && unzip -q -o terraform.zip
+            sudo rm -rf /usr/local/bin/terraform
             sudo mv /tmp/terraform /usr/local/bin/terraform
 
       - task: Bash@3
