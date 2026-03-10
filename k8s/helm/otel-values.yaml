@@ -1,6 +1,11 @@
 ---
 mode: deployment
 
+image:
+  repository: "otel/opentelemetry-collector-contrib"
+  pullPolicy: IfNotPresent
+  tag: "0.95.0"
+
 config:
   receivers:
     otlp:
