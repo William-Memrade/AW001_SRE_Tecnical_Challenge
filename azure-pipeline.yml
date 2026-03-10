@@ -18,9 +18,9 @@ variables:
 
 stages:
 - stage: Build
-  displayName: Validate Kubernetes YAML
+  displayName: Build and Validate Infrastructure
   jobs:
-    - job: validate_kubernetes
+    - job: validate_infrastructure
       steps:
       - checkout: self
 
@@ -48,8 +48,8 @@ stages:
             sudo mv shellcheck-v0.10.0/shellcheck /usr/local/bin/
 
             sudo yum install -y unzip
-            curl -LO https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip
-            unzip terraform_1.5.7_linux_amd64.zip
+            curl -fsSL https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip -o terraform.zip
+            unzip -q terraform.zip
             sudo mv terraform /usr/local/bin/
 
       - task: Bash@3
@@ -90,11 +90,11 @@ stages:
             terraform validate
 
 - stage: Deploy
-  displayName: Deploy to Kubernetes
+  displayName: Deploy Infrastructure
   dependsOn: Build
   condition: succeeded()
   jobs:
-    - job: deploy_kubernetes
+    - job: deploy_infrastructure
       steps:
       - task: Bash@3
         displayName: Install dependencies
@@ -111,8 +111,8 @@ stages:
             curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
             sudo yum install -y unzip
-            curl -LO https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip
-            unzip terraform_1.5.7_linux_amd64.zip
+            curl -fsSL https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip -o terraform.zip
+            unzip -q terraform.zip
             sudo mv terraform /usr/local/bin/
 
       - task: Bash@3
@@ -218,7 +218,8 @@ stages:
             echo "-> http://$TF_ALB_URL"
             echo "=============================================================================="
 
-- stage: DeploymentDestroy
+- stage: DestroyApproval
+  displayName: Approve Destroy Infrastructure
   dependsOn: Deploy
   jobs:
   - deployment: ApprovalJob
@@ -231,12 +232,12 @@ stages:
             displayName: 'Approval Step'
 
 - stage: Destroy
-  displayName: Destroy Kubernetes Cluster
-  dependsOn: DeploymentDestroy
+  displayName: Destroy Infrastructure
+  dependsOn: DestroyApproval
   condition: succeeded()
   jobs:
-    - job: destroy_kubernetes
-      displayName: Destroy KOps Cluster
+    - job: destroy_infrastructure
+      displayName: Destroy Infrastructure
       steps:
       - task: Bash@3
         displayName: Install dependencies
@@ -257,8 +258,8 @@ stages:
             sudo mv kops /usr/local/bin/kops
 
             sudo yum install -y unzip
-            curl -LO https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip
-            unzip terraform_1.5.7_linux_amd64.zip
+            curl -fsSL https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip -o terraform.zip
+            unzip -q terraform.zip
             sudo mv terraform /usr/local/bin/
 
       - task: Bash@3
