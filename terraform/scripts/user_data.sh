@@ -30,7 +30,55 @@ systemctl start auditd
 apt-get install -y nginx
 
 # 6. Configurar el contenido del servidor web
-echo "Estos servidores son elásticos" > /var/www/html/index.html
+cat << 'EOF' > /var/www/html/index.html
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Web App ALB</title>
+</head>
+<body>
+    <h1>Estos servidores son elásticos</h1>
+</body>
+</html>
+EOF
+
+# 7. Instalar OpenTelemetry Collector
+echo "Instalando OpenTelemetry Collector..."
+wget https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v0.95.0/otelcol-contrib_0.95.0_linux_amd64.deb
+dpkg -i otelcol-contrib_0.95.0_linux_amd64.deb
+
+cat << 'EOF' > /etc/otelcol-contrib/config.yaml
+receivers:
+  filelog:
+    include: [ /var/log/nginx/access.log, /var/log/nginx/error.log ]
+  hostmetrics:
+    collection_interval: 10s
+    scrapers:
+      cpu:
+      memory:
+processors:
+  batch:
+exporters:
+  otlp:
+    # URL DEL INGRESS O LOAD BALANCER DEL CLUSTER K8s (A REEMPLAZAR LUEGO CON EL DNS CORRECTO)
+    endpoint: "otel-collector.observability.svc.cluster.local:4317"
+    tls:
+      insecure: true
+service:
+  pipelines:
+    logs:
+      receivers: [filelog]
+      processors: [batch]
+      exporters: [otlp]
+    metrics:
+      receivers: [hostmetrics]
+      processors: [batch]
+      exporters: [otlp]
+EOF
+
+systemctl enable otelcol-contrib
+systemctl restart otelcol-contrib
 
 # Reiniciar y habilitar nginx
 systemctl enable nginx

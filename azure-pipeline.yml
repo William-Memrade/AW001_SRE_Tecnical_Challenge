@@ -107,48 +107,75 @@ stages:
             aws configure set aws_secret_access_key $(AWS_SECRET_ACCESS_KEY)
             aws configure set default.region $(AWS_REGION)
 
-      # - task: Bash@3
-      #   displayName: Create Kops Cluster
-      #   inputs:
-      #     targetType: inline
-      #     script: |
-      #       curl -Lo kops https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | grep tag_name | cut -d '"' -f 4)/kops-linux-amd64
-      #       chmod +x kops
-      #       sudo mv kops /usr/local/bin/kops
+      - task: Bash@3
+        displayName: Create Kops Cluster
+        inputs:
+          targetType: inline
+          script: |
+            curl -Lo kops https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | grep tag_name | cut -d '"' -f 4)/kops-linux-amd64
+            chmod +x kops
+            sudo mv kops /usr/local/bin/kops
 
-      #       chmod +x $(working_directory)/infrastructure/kops-cluster.sh
-      #       bash $(working_directory)/infrastructure/kops-cluster.sh
-      #   env:
-      #     EKS_CLUSTER_NAME: $(EKS_CLUSTER_NAME)
-      #     KOPS_STORAGE_BUCKET: $(KOPS_STORAGE_BUCKET)
-      #     AWS_REGION: $(AWS_REGION)
-      #     AWS_ZONES: $(AWS_ZONES)
+            chmod +x $(working_directory)/infrastructure/kops-cluster.sh
+            bash $(working_directory)/infrastructure/kops-cluster.sh
+        env:
+          EKS_CLUSTER_NAME: $(EKS_CLUSTER_NAME)
+          KOPS_STORAGE_BUCKET: $(KOPS_STORAGE_BUCKET)
+          AWS_REGION: $(AWS_REGION)
+          AWS_ZONES: $(AWS_ZONES)
 
-      # - task: Bash@3
-      #   displayName: Update kubeconfig via KOps
-      #   inputs:
-      #     targetType: inline
-      #     script: |
-      #       # Exportar el S3
-      #       kops export kubeconfig --admin --name $(EKS_CLUSTER_NAME) --state s3://$(KOPS_STORAGE_BUCKET)
+      - task: Bash@3
+        displayName: Update kubeconfig via KOps
+        inputs:
+          targetType: inline
+          script: |
+            # Exportar el S3
+            kops export kubeconfig --admin --name $(EKS_CLUSTER_NAME) --state s3://$(KOPS_STORAGE_BUCKET)
 
-      # - task: Bash@3
-      #   displayName: Deploy to Kubernetes (EKS - Manifestos)
-      #   inputs:
-      #     targetType: 'inline'
-      #     script: |
-      #       chmod +x $(working_directory)/scripts/deploy.sh
-      #       bash $(working_directory)/scripts/deploy.sh
+      - task: Bash@3
+        displayName: Deploy to Kubernetes (EKS - Manifestos)
+        inputs:
+          targetType: 'inline'
+          script: |
+            chmod +x $(working_directory)/scripts/deploy.sh
+            bash $(working_directory)/scripts/deploy.sh
 
-      # - task: Bash@3
-      #   displayName: Deploy Nginx with Helm
-      #   inputs:
-      #     targetType: inline
-      #     script: |
-      #       helm upgrade --install nginx oci://registry-1.docker.io/bitnamicharts/nginx \
-      #         -f $(working_directory)/helm/values-nginx.yaml \
-      #         --namespace memrade-frontend \
-      #         --create-namespace
+      - task: Bash@3
+        displayName: Deploy Nginx with Helm
+        inputs:
+          targetType: inline
+          script: |
+            helm upgrade --install nginx oci://registry-1.docker.io/bitnamicharts/nginx \
+              -f $(working_directory)/helm/values-nginx.yaml \
+              --namespace memrade-frontend \
+              --create-namespace
+
+      - task: Bash@3
+        displayName: Deploy Observability Stack (Grafana, Prom, Loki, Tempo, OTel)
+        inputs:
+          targetType: inline
+          script: |
+            echo "Adding Helm Repositories..."
+            helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+            helm repo add grafana https://grafana.github.io/helm-charts
+            helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+            helm repo update
+            
+            echo "Installing Kube-Prometheus-Stack (Prometheus, Grafana, Alertmanager)..."
+            helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+              --namespace observability --create-namespace
+            
+            echo "Installing Tempo (Traces)..."
+            helm upgrade --install tempo grafana/tempo \
+              --namespace observability --set search.enabled=true
+            
+            echo "Installing Loki (Logs)..."
+            helm upgrade --install loki grafana/loki-stack \
+              --namespace observability --set loki.persistence.enabled=true --set loki.persistence.size=10Gi
+            
+            echo "Installing OpenTelemetry Collector..."
+            helm upgrade --install otel-collector open-telemetry/opentelemetry-collector \
+              --namespace observability -f $(working_directory)/helm/otel-values.yaml
 
       - task: Bash@3
         displayName: Planning Terraform Infrastructure
@@ -195,6 +222,15 @@ stages:
             # done
             # echo "-> http://$HELM_URL"
             
+            echo "📊 URL 4: Grafana (Observabilidad)"
+            GRAFANA_URL=""
+            while [ -z "$GRAFANA_URL" ]; do
+              echo "Esperando a que AWS asigne el DNS para Grafana... (esto puede tardar 2-3 min)"
+              sleep 10
+              GRAFANA_URL=$(kubectl get svc kube-prometheus-stack-grafana -n observability -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            done
+            echo "-> http://$GRAFANA_URL (Usuario: admin, Password: prom-operator)"
+
             echo "🌐 URL 3: Terraform ALB"
             cd $(System.DefaultWorkingDirectory)/terraform
             TF_ALB_URL=$(/usr/local/bin/terraform output -raw alb_dns_name)
@@ -231,38 +267,38 @@ stages:
             aws configure set aws_secret_access_key $(AWS_SECRET_ACCESS_KEY)
             aws configure set default.region $(AWS_REGION)
 
-      # - task: Bash@3
-      #   displayName: Destroy Namespace and Resources
-      #   inputs:
-      #     targetType: inline
-      #     script: |
-      #       echo "Conectándose al clúster para limpieza controlada..."
-      #       kops export kubeconfig --admin --name $(EKS_CLUSTER_NAME) --state s3://$(KOPS_STORAGE_BUCKET) || echo "El clúster ya no existe, omitiendo..."
+      - task: Bash@3
+        displayName: Destroy Namespace and Resources
+        inputs:
+          targetType: inline
+          script: |
+            echo "Conectándose al clúster para limpieza controlada..."
+            kops export kubeconfig --admin --name $(EKS_CLUSTER_NAME) --state s3://$(KOPS_STORAGE_BUCKET) || echo "El clúster ya no existe, omitiendo..."
 
-      #       echo "Destruyendo Release de Helm..."
-      #       helm uninstall nginx --namespace memrade-frontend || true
+            echo "Destruyendo Release de Helm..."
+            helm uninstall nginx --namespace memrade-frontend || true
             
-      #       echo "Destruyendo manifiestos estáticos de Nginx..."
-      #       kubectl delete namespace memrade-frontend || true
+            echo "Destruyendo manifiestos estáticos de Nginx..."
+            kubectl delete namespace memrade-frontend || true
 
-      #       sleep 30
-      #   env:
-      #     EKS_CLUSTER_NAME: $(EKS_CLUSTER_NAME)
-      #     KOPS_STORAGE_BUCKET: $(KOPS_STORAGE_BUCKET)
+            sleep 30
+        env:
+          EKS_CLUSTER_NAME: $(EKS_CLUSTER_NAME)
+          KOPS_STORAGE_BUCKET: $(KOPS_STORAGE_BUCKET)
 
-      # - task: Bash@3
-      #   displayName: Destroy KOps Cluster
-      #   inputs:
-      #     targetType: inline
-      #     script: |
-      #       chmod +x $(working_directory)/infrastructure/kops-delete-cluster.sh
-      #       sed -i 's/read -p "   ¿Quieres eliminar también el bucket S3 ($KOPS_STORAGE_BUCKET) y todo su contenido? \[y\/N\]: " delete_bucket/delete_bucket="y"/g' $(working_directory)/infrastructure/kops-delete-cluster.sh
+      - task: Bash@3
+        displayName: Destroy KOps Cluster
+        inputs:
+          targetType: inline
+          script: |
+            chmod +x $(working_directory)/infrastructure/kops-delete-cluster.sh
+            sed -i 's/read -p "   ¿Quieres eliminar también el bucket S3 ($KOPS_STORAGE_BUCKET) y todo su contenido? \[y\/N\]: " delete_bucket/delete_bucket="y"/g' $(working_directory)/infrastructure/kops-delete-cluster.sh
 
-      #       bash $(working_directory)/infrastructure/kops-delete-cluster.sh
-      #   env:
-      #     EKS_CLUSTER_NAME: $(EKS_CLUSTER_NAME)
-      #     KOPS_STORAGE_BUCKET: $(KOPS_STORAGE_BUCKET)
-      #     AWS_REGION: $(AWS_REGION)
+            bash $(working_directory)/infrastructure/kops-delete-cluster.sh
+        env:
+          EKS_CLUSTER_NAME: $(EKS_CLUSTER_NAME)
+          KOPS_STORAGE_BUCKET: $(KOPS_STORAGE_BUCKET)
+          AWS_REGION: $(AWS_REGION)
 
       - task: Bash@3
         displayName: Destroy Terraform Infrastructure
