@@ -9,7 +9,7 @@ trigger:
       - 'azure-pipeline.yml'
 
 pool: k8s-agents
-name: CI - Validate Kubernetes
+name: Deploy Kubernetes Cluster
 
 variables:
   - group: kops-aws-credentials
@@ -47,6 +47,11 @@ stages:
             tar -xf shellcheck-v0.10.0.linux.x86_64.tar.xz
             sudo mv shellcheck-v0.10.0/shellcheck /usr/local/bin/
 
+            sudo yum install -y unzip
+            curl -LO https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip
+            unzip terraform_1.5.7_linux_amd64.zip
+            sudo mv terraform /usr/local/bin/
+
       - task: Bash@3
         displayName: Lint YAML files
         inputs:
@@ -75,23 +80,18 @@ stages:
           script: |
             shellcheck $(working_directory)/scripts/*.sh || true
 
-- stage: DeploymentApproval
-  dependsOn: Build
-  jobs:
-  - deployment: ApprovalJob
-    environment: 'DeploymentApprovers'
-    pool:
-      name: k8s-agents
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - script: echo "Esperando aprobación para continuar con el despliegue..."
-            displayName: 'Approval Step'
+      - task: Bash@3
+        displayName: Validate Terraform code
+        inputs:
+          targetType: 'inline'
+          script: |
+            cd $(System.DefaultWorkingDirectory)/terraform
+            terraform init -backend=false
+            terraform validate
 
 - stage: Deploy
   displayName: Deploy to Kubernetes
-  dependsOn: DeploymentApproval
+  dependsOn: Build
   condition: succeeded()
   jobs:
     - job: deploy_kubernetes
@@ -110,6 +110,11 @@ stages:
 
             curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
+            sudo yum install -y unzip
+            curl -LO https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip
+            unzip terraform_1.5.7_linux_amd64.zip
+            sudo mv terraform /usr/local/bin/
+
       - task: Bash@3
         displayName: Configure AWS Credentials
         inputs:
@@ -119,48 +124,65 @@ stages:
             aws configure set aws_secret_access_key $(AWS_SECRET_ACCESS_KEY)
             aws configure set default.region $(AWS_REGION)
 
+      # - task: Bash@3
+      #   displayName: Create Kops Cluster
+      #   inputs:
+      #     targetType: inline
+      #     script: |
+      #       curl -Lo kops https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | grep tag_name | cut -d '"' -f 4)/kops-linux-amd64
+      #       chmod +x kops
+      #       sudo mv kops /usr/local/bin/kops
+
+      #       chmod +x $(working_directory)/infrastructure/kops-cluster.sh
+      #       bash $(working_directory)/infrastructure/kops-cluster.sh
+      #   env:
+      #     EKS_CLUSTER_NAME: $(EKS_CLUSTER_NAME)
+      #     KOPS_STORAGE_BUCKET: $(KOPS_STORAGE_BUCKET)
+      #     AWS_REGION: $(AWS_REGION)
+      #     AWS_ZONES: $(AWS_ZONES)
+
+      # - task: Bash@3
+      #   displayName: Update kubeconfig via KOps
+      #   inputs:
+      #     targetType: inline
+      #     script: |
+      #       # Exportar el S3
+      #       kops export kubeconfig --admin --name $(EKS_CLUSTER_NAME) --state s3://$(KOPS_STORAGE_BUCKET)
+
+      # - task: Bash@3
+      #   displayName: Deploy to Kubernetes (EKS - Manifestos)
+      #   inputs:
+      #     targetType: 'inline'
+      #     script: |
+      #       chmod +x $(working_directory)/scripts/deploy.sh
+      #       bash $(working_directory)/scripts/deploy.sh
+
+      # - task: Bash@3
+      #   displayName: Deploy Nginx with Helm
+      #   inputs:
+      #     targetType: inline
+      #     script: |
+      #       helm upgrade --install nginx oci://registry-1.docker.io/bitnamicharts/nginx \
+      #         -f $(working_directory)/helm/values-nginx.yaml \
+      #         --namespace memrade-frontend \
+      #         --create-namespace
+
       - task: Bash@3
-        displayName: Provision KOps Cluster (Infrastructure)
+        displayName: Planning Terraform Infrastructure
         inputs:
           targetType: inline
           script: |
-            curl -Lo kops https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | grep tag_name | cut -d '"' -f 4)/kops-linux-amd64
-            chmod +x kops
-            sudo mv kops /usr/local/bin/kops
-
-            chmod +x $(working_directory)/infrastructure/kops-cluster.sh
-            bash $(working_directory)/infrastructure/kops-cluster.sh
-        env:
-          EKS_CLUSTER_NAME: $(EKS_CLUSTER_NAME)
-          KOPS_STORAGE_BUCKET: $(KOPS_STORAGE_BUCKET)
-          AWS_REGION: $(AWS_REGION)
-          AWS_ZONES: $(AWS_ZONES)
+            cd $(System.DefaultWorkingDirectory)/terraform
+            terraform init
+            terraform plan -out=tfplan
 
       - task: Bash@3
-        displayName: Update kubeconfig via KOps
+        displayName: Deploy Terraform Infrastructure
         inputs:
           targetType: inline
           script: |
-            # Exportar el S3
-            kops export kubeconfig --admin --name $(EKS_CLUSTER_NAME) --state s3://$(KOPS_STORAGE_BUCKET)
-
-      - task: Bash@3
-        displayName: Deploy to Kubernetes (EKS - Manifestos)
-        inputs:
-          targetType: 'inline'
-          script: |
-            chmod +x $(working_directory)/scripts/deploy.sh
-            bash $(working_directory)/scripts/deploy.sh
-
-      - task: Bash@3
-        displayName: Deploy Nginx with Helm
-        inputs:
-          targetType: inline
-          script: |
-            helm upgrade --install nginx oci://registry-1.docker.io/bitnamicharts/nginx \
-              -f $(working_directory)/helm/values-nginx.yaml \
-              --namespace memrade-frontend \
-              --create-namespace
+            cd $(System.DefaultWorkingDirectory)/terraform
+            terraform apply -auto-approve tfplan
 
       - task: Bash@3
         displayName: Print Public URLs
@@ -172,23 +194,28 @@ stages:
             echo "=============================================================================="
             echo "Extrayendo URLs públicas de AWS Elastic Load Balancer..."
             
-            echo "🌐 URL 1: Nginx (Manifiestos manuales / ConfigMap propio)"
-            MANIFEST_URL=""
-            while [ -z "$MANIFEST_URL" ]; do
-              echo "Esperando a que AWS asigne el DNS para Nginx Manual... (esto puede tardar 2-3 min)"
-              sleep 10
-              MANIFEST_URL=$(kubectl get svc nginx-service -n memrade-frontend -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-            done
-            echo "-> http://$MANIFEST_URL"
+            # echo "🌐 URL 1: Nginx (Manifiestos manuales / ConfigMap propio)"
+            # MANIFEST_URL=""
+            # while [ -z "$MANIFEST_URL" ]; do
+            #   echo "Esperando a que AWS asigne el DNS para Nginx Manual... (esto puede tardar 2-3 min)"
+            #   sleep 10
+            #   MANIFEST_URL=$(kubectl get svc nginx-service -n memrade-frontend -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            # done
+            # echo "-> http://$MANIFEST_URL"
             
-            echo "🌐 URL 2: Nginx (Helm Chart)"
-            HELM_URL=""
-            while [ -z "$HELM_URL" ]; do
-              echo "Esperando a que AWS asigne el DNS para Nginx Helm... (esto puede tardar 2-3 min)"
-              sleep 10
-              HELM_URL=$(kubectl get svc nginx -n memrade-frontend -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-            done
-            echo "-> http://$HELM_URL"
+            # echo "🌐 URL 2: Nginx (Helm Chart)"
+            # HELM_URL=""
+            # while [ -z "$HELM_URL" ]; do
+            #   echo "Esperando a que AWS asigne el DNS para Nginx Helm... (esto puede tardar 2-3 min)"
+            #   sleep 10
+            #   HELM_URL=$(kubectl get svc nginx -n memrade-frontend -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            # done
+            # echo "-> http://$HELM_URL"
+            
+            echo "🌐 URL 3: Terraform ALB"
+            cd $(System.DefaultWorkingDirectory)/terraform
+            TF_ALB_URL=$(terraform output -raw alb_dns_name)
+            echo "-> http://$TF_ALB_URL"
             echo "=============================================================================="
 
 - stage: DeploymentDestroy
@@ -229,6 +256,11 @@ stages:
             chmod +x kops
             sudo mv kops /usr/local/bin/kops
 
+            sudo yum install -y unzip
+            curl -LO https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip
+            unzip terraform_1.5.7_linux_amd64.zip
+            sudo mv terraform /usr/local/bin/
+
       - task: Bash@3
         displayName: Configure AWS Credentials
         inputs:
@@ -238,35 +270,44 @@ stages:
             aws configure set aws_secret_access_key $(AWS_SECRET_ACCESS_KEY)
             aws configure set default.region $(AWS_REGION)
 
-      - task: Bash@3
-        displayName: Teardown Applications (Graceful Shutdown)
-        inputs:
-          targetType: inline
-          script: |
-            echo "Conectándose al clúster para limpieza controlada..."
-            kops export kubeconfig --admin --name $(EKS_CLUSTER_NAME) --state s3://$(KOPS_STORAGE_BUCKET) || echo "El clúster ya no existe, omitiendo..."
+      # - task: Bash@3
+      #   displayName: Destroy Namespace and Resources
+      #   inputs:
+      #     targetType: inline
+      #     script: |
+      #       echo "Conectándose al clúster para limpieza controlada..."
+      #       kops export kubeconfig --admin --name $(EKS_CLUSTER_NAME) --state s3://$(KOPS_STORAGE_BUCKET) || echo "El clúster ya no existe, omitiendo..."
 
-            echo "Destruyendo Release de Helm..."
-            helm uninstall nginx --namespace memrade-frontend || true
+      #       echo "Destruyendo Release de Helm..."
+      #       helm uninstall nginx --namespace memrade-frontend || true
             
-            echo "Destruyendo manifiestos estáticos de Nginx..."
-            kubectl delete namespace memrade-frontend || true
+      #       echo "Destruyendo manifiestos estáticos de Nginx..."
+      #       kubectl delete namespace memrade-frontend || true
 
-            sleep 30
-        env:
-          EKS_CLUSTER_NAME: $(EKS_CLUSTER_NAME)
-          KOPS_STORAGE_BUCKET: $(KOPS_STORAGE_BUCKET)
+      #       sleep 30
+      #   env:
+      #     EKS_CLUSTER_NAME: $(EKS_CLUSTER_NAME)
+      #     KOPS_STORAGE_BUCKET: $(KOPS_STORAGE_BUCKET)
+
+      # - task: Bash@3
+      #   displayName: Destroy KOps Cluster
+      #   inputs:
+      #     targetType: inline
+      #     script: |
+      #       chmod +x $(working_directory)/infrastructure/kops-delete-cluster.sh
+      #       sed -i 's/read -p "   ¿Quieres eliminar también el bucket S3 ($KOPS_STORAGE_BUCKET) y todo su contenido? \[y\/N\]: " delete_bucket/delete_bucket="y"/g' $(working_directory)/infrastructure/kops-delete-cluster.sh
+
+      #       bash $(working_directory)/infrastructure/kops-delete-cluster.sh
+      #   env:
+      #     EKS_CLUSTER_NAME: $(EKS_CLUSTER_NAME)
+      #     KOPS_STORAGE_BUCKET: $(KOPS_STORAGE_BUCKET)
+      #     AWS_REGION: $(AWS_REGION)
 
       - task: Bash@3
-        displayName: Destroy KOps Cluster (Infrastructure)
+        displayName: Destroy Terraform Infrastructure
         inputs:
           targetType: inline
           script: |
-            chmod +x $(working_directory)/infrastructure/kops-delete-cluster.sh
-            sed -i 's/read -p "   ¿Quieres eliminar también el bucket S3 ($KOPS_STORAGE_BUCKET) y todo su contenido? \[y\/N\]: " delete_bucket/delete_bucket="y"/g' $(working_directory)/infrastructure/kops-delete-cluster.sh
-
-            bash $(working_directory)/infrastructure/kops-delete-cluster.sh
-        env:
-          EKS_CLUSTER_NAME: $(EKS_CLUSTER_NAME)
-          KOPS_STORAGE_BUCKET: $(KOPS_STORAGE_BUCKET)
-          AWS_REGION: $(AWS_REGION)
+            cd $(System.DefaultWorkingDirectory)/terraform
+            terraform init
+            terraform destroy -auto-approve
