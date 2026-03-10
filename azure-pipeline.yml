@@ -17,246 +17,246 @@ variables:
     value: '$(System.DefaultWorkingDirectory)/k8s'
 
 stages:
-- stage: Build
-  displayName: Build and Validate Infrastructure
-  jobs:
-    - job: validate_infrastructure
-      steps:
-      - checkout: self
-        clean: true
+# - stage: Build
+#   displayName: Build and Validate Infrastructure
+#   jobs:
+#     - job: validate_infrastructure
+#       steps:
+#       - checkout: self
+#         clean: true
 
-      - task: Bash@3
-        displayName: Install dependencies
-        inputs:
-          targetType: 'inline'
-          script: |
-            sudo yum update -y
-            sudo yum install -y python3-pip
-            pip3 install yamllint --user
+#       - task: Bash@3
+#         displayName: Install dependencies
+#         inputs:
+#           targetType: 'inline'
+#           script: |
+#             sudo yum update -y
+#             sudo yum install -y python3-pip
+#             pip3 install yamllint --user
 
-            curl -LO https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl
-            chmod +x kubectl
-            sudo mv kubectl /usr/local/bin/
+#             curl -LO https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl
+#             chmod +x kubectl
+#             sudo mv kubectl /usr/local/bin/
 
-            curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+#             curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
-            curl -L https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz -o kubeconform.tar.gz
-            tar -xzf kubeconform.tar.gz
-            sudo mv kubeconform /usr/local/bin/
+#             curl -L https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz -o kubeconform.tar.gz
+#             tar -xzf kubeconform.tar.gz
+#             sudo mv kubeconform /usr/local/bin/
 
-            curl -LO https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.linux.x86_64.tar.xz
-            tar -xf shellcheck-v0.10.0.linux.x86_64.tar.xz
-            sudo mv shellcheck-v0.10.0/shellcheck /usr/local/bin/
+#             curl -LO https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.linux.x86_64.tar.xz
+#             tar -xf shellcheck-v0.10.0.linux.x86_64.tar.xz
+#             sudo mv shellcheck-v0.10.0/shellcheck /usr/local/bin/
 
-            sudo yum install -y unzip
-            curl -fsSL https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip -o /tmp/terraform.zip
-            cd /tmp && unzip -q -o terraform.zip
-            sudo rm -rf /usr/local/bin/terraform
-            sudo mv /tmp/terraform /usr/local/bin/terraform
+#             sudo yum install -y unzip
+#             curl -fsSL https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip -o /tmp/terraform.zip
+#             cd /tmp && unzip -q -o terraform.zip
+#             sudo rm -rf /usr/local/bin/terraform
+#             sudo mv /tmp/terraform /usr/local/bin/terraform
 
-      - task: Bash@3
-        displayName: Lint YAML files
-        inputs:
-          targetType: 'inline'
-          script: |
-            yamllint $(working_directory)
+#       - task: Bash@3
+#         displayName: Lint YAML files
+#         inputs:
+#           targetType: 'inline'
+#           script: |
+#             yamllint $(working_directory)
 
-      - task: Bash@3
-        displayName: Validate Kubernetes manifests
-        inputs:
-          targetType: 'inline'
-          script: |
-            kubeconform -strict -summary $(working_directory)/kubernetes/*.yaml
+#       - task: Bash@3
+#         displayName: Validate Kubernetes manifests
+#         inputs:
+#           targetType: 'inline'
+#           script: |
+#             kubeconform -strict -summary $(working_directory)/kubernetes/*.yaml
 
-      - task: Bash@3
-        displayName: Validate Helm chart rendering
-        inputs:
-          targetType: 'inline'
-          script: |
-            helm template nginx oci://registry-1.docker.io/bitnamicharts/nginx -f $(working_directory)/helm/values-nginx.yaml
+#       - task: Bash@3
+#         displayName: Validate Helm chart rendering
+#         inputs:
+#           targetType: 'inline'
+#           script: |
+#             helm template nginx oci://registry-1.docker.io/bitnamicharts/nginx -f $(working_directory)/helm/values-nginx.yaml
 
-      - task: Bash@3
-        displayName: Check shell scripts
-        inputs:
-          targetType: 'inline'
-          script: |
-            shellcheck $(working_directory)/scripts/*.sh || true
+#       - task: Bash@3
+#         displayName: Check shell scripts
+#         inputs:
+#           targetType: 'inline'
+#           script: |
+#             shellcheck $(working_directory)/scripts/*.sh || true
 
-      - task: Bash@3
-        displayName: Validate Terraform code
-        inputs:
-          targetType: 'inline'
-          workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
-          script: |
-            /usr/local/bin/terraform init -backend=false
-            /usr/local/bin/terraform validate
+#       - task: Bash@3
+#         displayName: Validate Terraform code
+#         inputs:
+#           targetType: 'inline'
+#           workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+#           script: |
+#             /usr/local/bin/terraform init -backend=false
+#             /usr/local/bin/terraform validate
 
-- stage: Deploy
-  displayName: Deploy Infrastructure
-  dependsOn: Build
-  condition: succeeded()
-  jobs:
-    - job: deploy_infrastructure
-      steps:
-      - task: Bash@3
-        displayName: Configure AWS Credentials
-        inputs:
-          targetType: inline
-          script: |
-            aws configure set aws_access_key_id $(AWS_ACCESS_KEY_ID)
-            aws configure set aws_secret_access_key $(AWS_SECRET_ACCESS_KEY)
-            aws configure set default.region $(AWS_REGION)
+# - stage: Deploy
+#   displayName: Deploy Infrastructure
+#   dependsOn: Build
+#   condition: succeeded()
+#   jobs:
+#     - job: deploy_infrastructure
+#       steps:
+#       - task: Bash@3
+#         displayName: Configure AWS Credentials
+#         inputs:
+#           targetType: inline
+#           script: |
+#             aws configure set aws_access_key_id $(AWS_ACCESS_KEY_ID)
+#             aws configure set aws_secret_access_key $(AWS_SECRET_ACCESS_KEY)
+#             aws configure set default.region $(AWS_REGION)
 
-      - task: Bash@3
-        displayName: Create Kops Cluster
-        inputs:
-          targetType: inline
-          script: |
-            curl -Lo kops https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | grep tag_name | cut -d '"' -f 4)/kops-linux-amd64
-            chmod +x kops
-            sudo mv kops /usr/local/bin/kops
+#       - task: Bash@3
+#         displayName: Create Kops Cluster
+#         inputs:
+#           targetType: inline
+#           script: |
+#             curl -Lo kops https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | grep tag_name | cut -d '"' -f 4)/kops-linux-amd64
+#             chmod +x kops
+#             sudo mv kops /usr/local/bin/kops
 
-            chmod +x $(working_directory)/infrastructure/kops-cluster.sh
-            bash $(working_directory)/infrastructure/kops-cluster.sh
-        env:
-          EKS_CLUSTER_NAME: $(EKS_CLUSTER_NAME)
-          KOPS_STORAGE_BUCKET: $(KOPS_STORAGE_BUCKET)
-          AWS_REGION: $(AWS_REGION)
-          AWS_ZONES: $(AWS_ZONES)
+#             chmod +x $(working_directory)/infrastructure/kops-cluster.sh
+#             bash $(working_directory)/infrastructure/kops-cluster.sh
+#         env:
+#           EKS_CLUSTER_NAME: $(EKS_CLUSTER_NAME)
+#           KOPS_STORAGE_BUCKET: $(KOPS_STORAGE_BUCKET)
+#           AWS_REGION: $(AWS_REGION)
+#           AWS_ZONES: $(AWS_ZONES)
 
-      - task: Bash@3
-        displayName: Update kubeconfig via KOps
-        inputs:
-          targetType: inline
-          script: |
-            # Exportar el S3
-            kops export kubeconfig --admin --name $(EKS_CLUSTER_NAME) --state s3://$(KOPS_STORAGE_BUCKET)
+#       - task: Bash@3
+#         displayName: Update kubeconfig via KOps
+#         inputs:
+#           targetType: inline
+#           script: |
+#             # Exportar el S3
+#             kops export kubeconfig --admin --name $(EKS_CLUSTER_NAME) --state s3://$(KOPS_STORAGE_BUCKET)
 
-      - task: Bash@3
-        displayName: Deploy to Kubernetes (EKS - Manifestos)
-        inputs:
-          targetType: 'inline'
-          script: |
-            chmod +x $(working_directory)/scripts/deploy.sh
-            bash $(working_directory)/scripts/deploy.sh
+#       - task: Bash@3
+#         displayName: Deploy to Kubernetes (EKS - Manifestos)
+#         inputs:
+#           targetType: 'inline'
+#           script: |
+#             chmod +x $(working_directory)/scripts/deploy.sh
+#             bash $(working_directory)/scripts/deploy.sh
 
-      - task: Bash@3
-        displayName: Deploy Nginx with Helm
-        inputs:
-          targetType: inline
-          script: |
-            helm upgrade --install nginx oci://registry-1.docker.io/bitnamicharts/nginx \
-              -f $(working_directory)/helm/values-nginx.yaml \
-              --namespace memrade-frontend \
-              --create-namespace
+#       - task: Bash@3
+#         displayName: Deploy Nginx with Helm
+#         inputs:
+#           targetType: inline
+#           script: |
+#             helm upgrade --install nginx oci://registry-1.docker.io/bitnamicharts/nginx \
+#               -f $(working_directory)/helm/values-nginx.yaml \
+#               --namespace memrade-frontend \
+#               --create-namespace
 
-      - task: Bash@3
-        displayName: Deploy Observability Stack (Grafana, Prom, Loki, Tempo, OTel)
-        inputs:
-          targetType: inline
-          script: |
-            echo "Adding Helm Repositories..."
-            helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-            helm repo add grafana https://grafana.github.io/helm-charts
-            helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
-            helm repo update
+#       - task: Bash@3
+#         displayName: Deploy Observability Stack (Grafana, Prom, Loki, Tempo, OTel)
+#         inputs:
+#           targetType: inline
+#           script: |
+#             echo "Adding Helm Repositories..."
+#             helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+#             helm repo add grafana https://grafana.github.io/helm-charts
+#             helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+#             helm repo update
             
-            echo "Installing Kube-Prometheus-Stack (Prometheus, Grafana, Alertmanager)..."
-            helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
-              --namespace observability --create-namespace \
-              --set grafana.service.type=LoadBalancer \
-              --set grafana.adminPassword=admin
+#             echo "Installing Kube-Prometheus-Stack (Prometheus, Grafana, Alertmanager)..."
+#             helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+#               --namespace observability --create-namespace \
+#               --set grafana.service.type=LoadBalancer \
+#               --set grafana.adminPassword=admin
             
-            echo "Installing Tempo (Traces)..."
-            helm upgrade --install tempo grafana/tempo \
-              --namespace observability --set search.enabled=true
+#             echo "Installing Tempo (Traces)..."
+#             helm upgrade --install tempo grafana/tempo \
+#               --namespace observability --set search.enabled=true
             
-            echo "Installing Loki (Logs)..."
-            helm upgrade --install loki grafana/loki-stack \
-              --namespace observability --set loki.persistence.enabled=true --set loki.persistence.size=10Gi
+#             echo "Installing Loki (Logs)..."
+#             helm upgrade --install loki grafana/loki-stack \
+#               --namespace observability --set loki.persistence.enabled=true --set loki.persistence.size=10Gi
             
-            echo "Installing OpenTelemetry Collector..."
-            helm upgrade --install otel-collector open-telemetry/opentelemetry-collector \
-              --namespace observability -f $(working_directory)/helm/otel-values.yaml
+#             echo "Installing OpenTelemetry Collector..."
+#             helm upgrade --install otel-collector open-telemetry/opentelemetry-collector \
+#               --namespace observability -f $(working_directory)/helm/otel-values.yaml
 
-      - task: Bash@3
-        displayName: Planning Terraform Infrastructure
-        inputs:
-          targetType: inline
-          workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
-          script: |
-            /usr/local/bin/terraform init
-            /usr/local/bin/terraform plan -out=tfplan
+#       - task: Bash@3
+#         displayName: Planning Terraform Infrastructure
+#         inputs:
+#           targetType: inline
+#           workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+#           script: |
+#             /usr/local/bin/terraform init
+#             /usr/local/bin/terraform plan -out=tfplan
 
-      - task: Bash@3
-        displayName: Deploy Terraform Infrastructure
-        inputs:
-          targetType: inline
-          workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
-          script: |
-            /usr/local/bin/terraform apply -auto-approve tfplan
+#       - task: Bash@3
+#         displayName: Deploy Terraform Infrastructure
+#         inputs:
+#           targetType: inline
+#           workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+#           script: |
+#             /usr/local/bin/terraform apply -auto-approve tfplan
 
-      - task: Bash@3
-        displayName: Print Public URLs
-        inputs:
-          targetType: inline
-          script: |
-            echo "=============================================================================="
-            echo "🎉 DESPLIEGUES FINALIZADOS CON ÉXITO 🎉"
-            echo "=============================================================================="
-            echo "Extrayendo URLs públicas de AWS Elastic Load Balancer..."
+#       - task: Bash@3
+#         displayName: Print Public URLs
+#         inputs:
+#           targetType: inline
+#           script: |
+#             echo "=============================================================================="
+#             echo "🎉 DESPLIEGUES FINALIZADOS CON ÉXITO 🎉"
+#             echo "=============================================================================="
+#             echo "Extrayendo URLs públicas de AWS Elastic Load Balancer..."
             
-            echo "🌐 URL 1: Nginx (Manifiestos manuales / ConfigMap propio)"
-            MANIFEST_URL=""
-            while [ -z "$MANIFEST_URL" ]; do
-              echo "Esperando a que AWS asigne el DNS para Nginx Manual... (esto puede tardar 2-3 min)"
-              sleep 10
-              MANIFEST_URL=$(kubectl get svc nginx-service -n memrade-frontend -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-            done
-            echo "-> http://$MANIFEST_URL"
+#             echo "🌐 URL 1: Nginx (Manifiestos manuales / ConfigMap propio)"
+#             MANIFEST_URL=""
+#             while [ -z "$MANIFEST_URL" ]; do
+#               echo "Esperando a que AWS asigne el DNS para Nginx Manual... (esto puede tardar 2-3 min)"
+#               sleep 10
+#               MANIFEST_URL=$(kubectl get svc nginx-service -n memrade-frontend -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+#             done
+#             echo "-> http://$MANIFEST_URL"
             
-            echo "🌐 URL 2: Nginx (Helm Chart)"
-            HELM_URL=""
-            while [ -z "$HELM_URL" ]; do
-              echo "Esperando a que AWS asigne el DNS para Nginx Helm... (esto puede tardar 2-3 min)"
-              sleep 10
-              HELM_URL=$(kubectl get svc nginx -n memrade-frontend -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-            done
-            echo "-> http://$HELM_URL"
+#             echo "🌐 URL 2: Nginx (Helm Chart)"
+#             HELM_URL=""
+#             while [ -z "$HELM_URL" ]; do
+#               echo "Esperando a que AWS asigne el DNS para Nginx Helm... (esto puede tardar 2-3 min)"
+#               sleep 10
+#               HELM_URL=$(kubectl get svc nginx -n memrade-frontend -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+#             done
+#             echo "-> http://$HELM_URL"
             
-            echo "🌐 URL 3: Terraform ALB"
-            cd $(System.DefaultWorkingDirectory)/terraform
-            TF_ALB_URL=$(/usr/local/bin/terraform output -raw alb_dns_name)
-            echo "-> http://$TF_ALB_URL"
+#             echo "🌐 URL 3: Terraform ALB"
+#             cd $(System.DefaultWorkingDirectory)/terraform
+#             TF_ALB_URL=$(/usr/local/bin/terraform output -raw alb_dns_name)
+#             echo "-> http://$TF_ALB_URL"
 
-            echo "🌐 URL 4: Grafana Observability Dashboards"
-            GRAFANA_URL=""
-            while [ -z "$GRAFANA_URL" ] || [ "$GRAFANA_URL" = "<pending>" ]; do
-              echo "Esperando a que AWS asigne el DNS para Grafana... (esto puede tardar 2-3 min)"
-              sleep 10
-              GRAFANA_URL=$(kubectl get svc kube-prometheus-stack-grafana -n observability -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-            done
-            echo "Accede a Grafana con el usuario 'admin' y contraseña 'admin'."
-            echo "-> http://$GRAFANA_URL"
-            echo "=============================================================================="
+#             echo "🌐 URL 4: Grafana Observability Dashboards"
+#             GRAFANA_URL=""
+#             while [ -z "$GRAFANA_URL" ] || [ "$GRAFANA_URL" = "<pending>" ]; do
+#               echo "Esperando a que AWS asigne el DNS para Grafana... (esto puede tardar 2-3 min)"
+#               sleep 10
+#               GRAFANA_URL=$(kubectl get svc kube-prometheus-stack-grafana -n observability -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+#             done
+#             echo "Accede a Grafana con el usuario 'admin' y contraseña 'admin'."
+#             echo "-> http://$GRAFANA_URL"
+#             echo "=============================================================================="
 
-- stage: DestroyApproval
-  displayName: Approve Destroy Infrastructure
-  dependsOn: Deploy
-  jobs:
-  - deployment: DestroyApprovalJob
-    environment: 'DeploymentApprovers'
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - script: echo "Esperando aprobación para continuar con el destroy..."
-            displayName: 'Approval Step'
+# - stage: DestroyApproval
+#   displayName: Approve Destroy Infrastructure
+#   dependsOn: Deploy
+#   jobs:
+#   - deployment: DestroyApprovalJob
+#     environment: 'DeploymentApprovers'
+#     strategy:
+#       runOnce:
+#         deploy:
+#           steps:
+#           - script: echo "Esperando aprobación para continuar con el destroy..."
+#             displayName: 'Approval Step'
 
 - stage: Destroy
   displayName: Destroy Infrastructure
-  dependsOn: DestroyApproval
-  condition: succeeded()
+  # dependsOn: DestroyApproval
+  # condition: succeeded()
   jobs:
     - job: destroy_infrastructure
       displayName: Destroy Infrastructure
@@ -310,4 +310,5 @@ stages:
           workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
           script: |
             /usr/local/bin/terraform init
+            /usr/local/bin/terraform plan -out=tfplan
             /usr/local/bin/terraform destroy -auto-approve
