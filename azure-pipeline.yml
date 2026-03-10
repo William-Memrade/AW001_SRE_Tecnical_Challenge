@@ -23,6 +23,7 @@ stages:
     - job: validate_infrastructure
       steps:
       - checkout: self
+        clean: true
 
       - task: Bash@3
         displayName: Install dependencies
@@ -97,26 +98,6 @@ stages:
   jobs:
     - job: deploy_infrastructure
       steps:
-      - task: Bash@3
-        displayName: Install dependencies
-        inputs:
-          targetType: 'inline'
-          script: |
-            sudo yum update
-            sudo yum install -y awscli
-
-            curl -LO https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl
-            chmod +x kubectl
-            sudo mv kubectl /usr/local/bin/
-
-            curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-
-            sudo yum install -y unzip
-            curl -fsSL https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip -o /tmp/terraform.zip
-            cd /tmp && unzip -q -o terraform.zip
-            sudo rm -rf /usr/local/bin/terraform
-            sudo mv /tmp/terraform /usr/local/bin/terraform
-
       - task: Bash@3
         displayName: Configure AWS Credentials
         inputs:
@@ -241,30 +222,6 @@ stages:
     - job: destroy_infrastructure
       displayName: Destroy Infrastructure
       steps:
-      - task: Bash@3
-        displayName: Install dependencies
-        inputs:
-          targetType: 'inline'
-          script: |
-            sudo yum update -y
-            sudo yum install -y awscli
-
-            curl -LO https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl
-            chmod +x kubectl
-            sudo mv kubectl /usr/local/bin/
-
-            curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-
-            curl -Lo kops https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | grep tag_name | cut -d '"' -f 4)/kops-linux-amd64
-            chmod +x kops
-            sudo mv kops /usr/local/bin/kops
-
-            sudo yum install -y unzip
-            curl -fsSL https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip -o /tmp/terraform.zip
-            cd /tmp && unzip -q -o terraform.zip
-            sudo rm -rf /usr/local/bin/terraform
-            sudo mv /tmp/terraform /usr/local/bin/terraform
-
       - task: Bash@3
         displayName: Configure AWS Credentials
         inputs:
