@@ -48,9 +48,9 @@ stages:
             sudo mv shellcheck-v0.10.0/shellcheck /usr/local/bin/
 
             sudo yum install -y unzip
-            curl -fsSL https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip -o terraform.zip
-            unzip -q -o terraform.zip
-            sudo mv terraform /usr/local/bin/
+            curl -fsSL https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip -o /tmp/terraform.zip
+            cd /tmp && unzip -q -o terraform.zip
+            sudo mv /tmp/terraform /usr/local/bin/terraform
 
       - task: Bash@3
         displayName: Lint YAML files
@@ -111,9 +111,9 @@ stages:
             curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
             sudo yum install -y unzip
-            curl -fsSL https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip -o terraform.zip
-            unzip -q -o terraform.zip
-            sudo mv terraform /usr/local/bin/
+            curl -fsSL https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip -o /tmp/terraform.zip
+            cd /tmp && unzip -q -o terraform.zip
+            sudo mv /tmp/terraform /usr/local/bin/terraform
 
       - task: Bash@3
         displayName: Configure AWS Credentials
@@ -258,9 +258,9 @@ stages:
             sudo mv kops /usr/local/bin/kops
 
             sudo yum install -y unzip
-            curl -fsSL https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip -o terraform.zip
-            unzip -q -o terraform.zip
-            sudo mv terraform /usr/local/bin/
+            curl -fsSL https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip -o /tmp/terraform.zip
+            cd /tmp && unzip -q -o terraform.zip
+            sudo mv /tmp/terraform /usr/local/bin/terraform
 
       - task: Bash@3
         displayName: Configure AWS Credentials
