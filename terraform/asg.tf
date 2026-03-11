@@ -23,6 +23,10 @@ resource "aws_launch_template" "web" {
     associate_public_ip_address = false
   }
 
+  iam_instance_profile {
+    name = aws_iam_instance_profile.ssm_profile.name
+  }
+
   user_data = filebase64("${path.module}/scripts/user_data.sh")
 
   lifecycle {
