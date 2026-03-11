@@ -128,7 +128,10 @@ stages:
             helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
               --namespace observability --create-namespace \
               --set grafana.service.type=LoadBalancer \
-              --set grafana.adminPassword=admin
+              --set grafana.adminPassword=admin \
+              --set "grafana.additionalDataSources[0].name=Loki" \
+              --set "grafana.additionalDataSources[0].type=loki" \
+              --set "grafana.additionalDataSources[0].url=http://loki.observability.svc.cluster.local:3100"
             
             echo "Installing Tempo (Traces)..."
             helm upgrade --install tempo grafana/tempo \
@@ -137,7 +140,7 @@ stages:
             echo "Installing Loki (Logs)..."
             helm upgrade --install loki grafana/loki-stack \
               --namespace observability --set loki.persistence.enabled=true --set loki.persistence.size=10Gi \
-              --set grafana.sidecar.datasources.isDefault=false
+              --set grafana.sidecar.datasources.enabled=false
             
             echo "Installing OpenTelemetry Collector..."
             helm upgrade --install otel-collector open-telemetry/opentelemetry-collector \
