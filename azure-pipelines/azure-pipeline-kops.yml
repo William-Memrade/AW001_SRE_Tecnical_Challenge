@@ -158,7 +158,8 @@ stages:
             
             echo "Installing Loki (Logs)..."
             helm upgrade --install loki grafana/loki-stack \
-              --namespace observability --set loki.persistence.enabled=true --set loki.persistence.size=10Gi
+              --namespace observability --set loki.persistence.enabled=true --set loki.persistence.size=10Gi \
+              --set grafana.sidecar.datasources.isDefault=false
             
             echo "Installing OpenTelemetry Collector..."
             helm upgrade --install otel-collector open-telemetry/opentelemetry-collector \
