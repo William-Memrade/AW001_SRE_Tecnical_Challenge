@@ -11,6 +11,14 @@ resource "aws_security_group" "alb_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  ingress {
+    description = "Grafana from internet"
+    from_port   = 3000
+    to_port     = 3000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   egress {
     description = "Allow all outbound traffic"
     from_port   = 0
@@ -33,6 +41,14 @@ resource "aws_security_group" "web_sg" {
     description     = "HTTP from ALB"
     from_port       = 80
     to_port         = 80
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb_sg.id]
+  }
+
+  ingress {
+    description     = "Grafana from ALB"
+    from_port       = 3000
+    to_port         = 3000
     protocol        = "tcp"
     security_groups = [aws_security_group.alb_sg.id]
   }

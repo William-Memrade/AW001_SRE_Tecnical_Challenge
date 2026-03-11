@@ -34,12 +34,6 @@ stages:
             sudo yum install -y python3-pip
             pip3 install yamllint --user
 
-            curl -LO https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl
-            chmod +x kubectl
-            sudo mv kubectl /usr/local/bin/
-
-            curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-
             curl -LO https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.linux.x86_64.tar.xz
             tar -xf shellcheck-v0.10.0.linux.x86_64.tar.xz
             sudo mv shellcheck-v0.10.0/shellcheck /usr/local/bin/
@@ -100,69 +94,6 @@ stages:
             /usr/local/bin/terraform apply -auto-approve tfplan
 
       - task: Bash@3
-        displayName: Update kubeconfig via KOps
-        inputs:
-          targetType: inline
-          script: |
-            curl -Lo kops https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | grep tag_name | cut -d '"' -f 4)/kops-linux-amd64
-            chmod +x kops
-            sudo mv kops /usr/local/bin/kops
-            kops export kubeconfig --admin --name $(EKS_CLUSTER_NAME) --state s3://$(KOPS_STORAGE_BUCKET)
-        env:
-          EKS_CLUSTER_NAME: $(EKS_CLUSTER_NAME)
-          KOPS_STORAGE_BUCKET: $(KOPS_STORAGE_BUCKET)
-          AWS_REGION: $(AWS_REGION)
-
-      - task: Bash@3
-        displayName: Deploy Application (Nginx)
-        inputs:
-          targetType: inline
-          script: |
-            echo "Creating namespace memrade-frontend..."
-            kubectl create namespace memrade-frontend --dry-run=client -o yaml | kubectl apply -f -
-            
-            echo "Deploying Nginx via Helm..."
-            helm upgrade --install nginx bitnami/nginx \
-              --namespace memrade-frontend \
-              -f $(working_directory)/helm/values-nginx.yaml
-            
-            echo "Waiting for Nginx pods to be ready..."
-            kubectl rollout status deployment/nginx -n memrade-frontend --timeout=120s || true
-
-      - task: Bash@3
-        displayName: Deploy Observability Stack (Grafana, Prom, Loki, Tempo, OTel)
-        inputs:
-          targetType: inline
-          script: |
-            echo "Adding Helm Repositories..."
-            helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-            helm repo add grafana https://grafana.github.io/helm-charts
-            helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
-            helm repo update
-            
-            echo "Installing Kube-Prometheus-Stack (Prometheus, Grafana, Alertmanager)..."
-            helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
-              --namespace observability --create-namespace \
-              --set grafana.service.type=LoadBalancer \
-              --set grafana.adminPassword=admin \
-              --set "grafana.additionalDataSources[0].name=Loki" \
-              --set "grafana.additionalDataSources[0].type=loki" \
-              --set "grafana.additionalDataSources[0].url=http://loki.observability.svc.cluster.local:3100"
-            
-            echo "Installing Tempo (Traces)..."
-            helm upgrade --install tempo grafana/tempo \
-              --namespace observability --set search.enabled=true
-            
-            echo "Installing Loki (Logs)..."
-            helm upgrade --install loki grafana/loki-stack \
-              --namespace observability --set loki.persistence.enabled=true --set loki.persistence.size=10Gi \
-              --set grafana.sidecar.datasources.enabled=false
-            
-            echo "Installing OpenTelemetry Collector..."
-            helm upgrade --install otel-collector open-telemetry/opentelemetry-collector \
-              --namespace observability -f $(working_directory)/helm/otel-values.yaml
-
-      - task: Bash@3
         displayName: Print Public URLs
         inputs:
           targetType: inline
@@ -172,21 +103,18 @@ stages:
             echo "=============================================================================="
             echo "Extrayendo URLs públicas de AWS Elastic Load Balancer..."
             
-            echo "🌐 URL 1: Terraform ALB"
             cd $(System.DefaultWorkingDirectory)/terraform
             TF_ALB_URL=$(/usr/local/bin/terraform output -raw alb_dns_name)
-            echo "-> http://$TF_ALB_URL"
 
-            echo "🌐 URL 2: Grafana Observability Dashboards"
-            GRAFANA_URL=""
-            while [ -z "$GRAFANA_URL" ] || [ "$GRAFANA_URL" = "<pending>" ]; do
-              echo "Esperando a que AWS asigne el DNS para Grafana... (esto puede tardar 2-3 min)"
-              sleep 10
-              GRAFANA_URL=$(kubectl get svc kube-prometheus-stack-grafana -n observability -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-            done
+            echo "🌐 URL 1: Nginx Application"
+            echo "-> http://$TF_ALB_URL"
+            
+            echo "🌐 URL 2: Grafana Observability Dashboard (EC2 Native)"
             echo "Accede a Grafana con el usuario 'admin' y contraseña 'admin'."
-            echo "-> http://$GRAFANA_URL"
+            echo "-> http://$TF_ALB_URL:3000"
             echo "=============================================================================="
+
+
 
 - stage: DestroyApproval
   displayName: Approve Destroy Infrastructure
