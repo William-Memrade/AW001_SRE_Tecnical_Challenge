@@ -37,7 +37,7 @@ else
         --zones "$AWS_ZONES" \
         --control-plane-size "t3.small" \
         --control-plane-volume-size 10 \
-        --node-size "t3.micro" \
+        --node-size "t3.small" \
         --node-count 1 \
         --node-volume-size 10 \
         --networking calico \
