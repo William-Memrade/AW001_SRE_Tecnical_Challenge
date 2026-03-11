@@ -53,6 +53,14 @@ resource "aws_security_group" "web_sg" {
     security_groups = [aws_security_group.alb_sg.id]
   }
 
+  ingress {
+    description = "SSH from VPC (Bastion Host)"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = [aws_vpc.main.cidr_block]
+  }
+
   egress {
     description = "Allow all outbound traffic for package updates"
     from_port   = 0
