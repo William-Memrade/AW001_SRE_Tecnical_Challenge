@@ -6,10 +6,10 @@ trigger:
       - develop
   paths:
     exclude:
-      - 'azure-pipeline.yml'
+      - 'azure-pipelines/azure-pipeline-kops.yml'
 
 pool: k8s-agents
-name: Deploy Kubernetes Cluster
+name: Deploy Kops Cluster
 
 variables:
   - group: kops-aws-credentials
@@ -48,12 +48,6 @@ stages:
             tar -xf shellcheck-v0.10.0.linux.x86_64.tar.xz
             sudo mv shellcheck-v0.10.0/shellcheck /usr/local/bin/
 
-            sudo yum install -y unzip
-            curl -fsSL https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip -o /tmp/terraform.zip
-            cd /tmp && unzip -q -o terraform.zip
-            sudo rm -rf /usr/local/bin/terraform
-            sudo mv /tmp/terraform /usr/local/bin/terraform
-
       - task: Bash@3
         displayName: Lint YAML files
         inputs:
@@ -81,15 +75,6 @@ stages:
           targetType: 'inline'
           script: |
             shellcheck $(working_directory)/scripts/*.sh || true
-
-      - task: Bash@3
-        displayName: Validate Terraform code
-        inputs:
-          targetType: 'inline'
-          workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
-          script: |
-            /usr/local/bin/terraform init -backend=false
-            /usr/local/bin/terraform validate
 
 - stage: Deploy
   displayName: Deploy Infrastructure
@@ -180,23 +165,6 @@ stages:
               --namespace observability -f $(working_directory)/helm/otel-values.yaml
 
       - task: Bash@3
-        displayName: Planning Terraform Infrastructure
-        inputs:
-          targetType: inline
-          workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
-          script: |
-            /usr/local/bin/terraform init
-            /usr/local/bin/terraform plan -out=tfplan
-
-      - task: Bash@3
-        displayName: Deploy Terraform Infrastructure
-        inputs:
-          targetType: inline
-          workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
-          script: |
-            /usr/local/bin/terraform apply -auto-approve tfplan
-
-      - task: Bash@3
         displayName: Print Public URLs
         inputs:
           targetType: inline
@@ -223,13 +191,8 @@ stages:
               HELM_URL=$(kubectl get svc nginx -n memrade-frontend -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
             done
             echo "-> http://$HELM_URL"
-            
-            echo "🌐 URL 3: Terraform ALB"
-            cd $(System.DefaultWorkingDirectory)/terraform
-            TF_ALB_URL=$(/usr/local/bin/terraform output -raw alb_dns_name)
-            echo "-> http://$TF_ALB_URL"
 
-            echo "🌐 URL 4: Grafana Observability Dashboards"
+            echo "🌐 URL 3: Grafana Observability Dashboards"
             GRAFANA_URL=""
             while [ -z "$GRAFANA_URL" ] || [ "$GRAFANA_URL" = "<pending>" ]; do
               echo "Esperando a que AWS asigne el DNS para Grafana... (esto puede tardar 2-3 min)"
@@ -301,12 +264,3 @@ stages:
           EKS_CLUSTER_NAME: $(EKS_CLUSTER_NAME)
           KOPS_STORAGE_BUCKET: $(KOPS_STORAGE_BUCKET)
           AWS_REGION: $(AWS_REGION)
-
-      - task: Bash@3
-        displayName: Destroy Terraform Infrastructure
-        inputs:
-          targetType: inline
-          workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
-          script: |
-            /usr/local/bin/terraform init
-            /usr/local/bin/terraform destroy -auto-approve
