@@ -99,9 +99,9 @@ stages:
         inputs:
           targetType: inline
           script: |
-            curl -Lo kops https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | grep tag_name | cut -d '"' -f 4)/kops-linux-amd64
-            chmod +x kops
-            sudo mv kops /usr/local/bin/kops
+            curl -Lo /tmp/kops-binary https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | grep tag_name | cut -d '"' -f 4)/kops-linux-amd64
+            chmod +x /tmp/kops-binary
+            sudo mv /tmp/kops-binary /usr/local/bin/kops
 
             chmod +x $(kops_directory)/kops-cluster.sh
             bash $(kops_directory)/kops-cluster.sh
@@ -138,6 +138,37 @@ stages:
             helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
             helm repo update
             
+            echo "Creating namespace observability..."
+            kubectl create namespace observability --dry-run=client -o yaml | kubectl apply -f -
+
+            echo "Creating K8s Secret with EC2 SD scrape config (credenciales AWS from Variable Group)..."
+            kubectl create secret generic prometheus-ec2-scrape-config \
+              --namespace observability \
+              --from-literal=scrape-config.yaml="
+            - job_name: ec2-terraform-nodes
+              ec2_sd_configs:
+                - region: $(AWS_REGION)
+                  access_key: $(AWS_ACCESS_KEY_ID)
+                  secret_key: $(AWS_SECRET_ACCESS_KEY)
+                  port: 9100
+                  filters:
+                    - name: tag:Name
+                      values: [web-server-asg]
+                    - name: instance-state-name
+                      values: [running]
+              relabel_configs:
+                - source_labels: [__meta_ec2_public_ip]
+                  target_label: __address__
+                  replacement: '\${1}:9100'
+                - source_labels: [__meta_ec2_public_ip]
+                  target_label: public_ip
+                - source_labels: [__meta_ec2_instance_id]
+                  target_label: instance_id
+                - source_labels: [__meta_ec2_tag_Name]
+                  target_label: instance_name
+            " \
+              --dry-run=client -o yaml | kubectl apply -f -
+
             echo "Installing Kube-Prometheus-Stack (Prometheus, Grafana, Alertmanager, CRDs)..."
             helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
               --namespace observability --create-namespace \
