@@ -41,7 +41,7 @@ resource "aws_launch_template" "web" {
 resource "aws_autoscaling_group" "web_asg" {
   name                = "web-asg"
   vpc_zone_identifier = aws_subnet.public[*].id
-  target_group_arns   = [aws_lb_target_group.web_tg.arn, aws_lb_target_group.grafana_tg.arn]
+  target_group_arns   = [aws_lb_target_group.web_tg.arn]
   health_check_type   = "ELB"
   health_check_grace_period = 300
 

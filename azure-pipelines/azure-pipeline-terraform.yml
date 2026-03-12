@@ -101,20 +101,14 @@ stages:
             echo "=============================================================================="
             echo "🎉 DESPLIEGUES DE TERRAFORM FINALIZADOS CON ÉXITO 🎉"
             echo "=============================================================================="
-            echo "Extrayendo URLs públicas de AWS Elastic Load Balancer..."
+            echo "Extrayendo URL pública del AWS Elastic Load Balancer..."
             
             cd $(System.DefaultWorkingDirectory)/terraform
             TF_ALB_URL=$(/usr/local/bin/terraform output -raw alb_dns_name)
 
-            echo "🌐 URL 1: Nginx Application"
+            echo "🌐 Nginx Application"
             echo "-> http://$TF_ALB_URL"
-            
-            echo "🌐 URL 2: Grafana Observability Dashboard (EC2 Native)"
-            echo "Accede a Grafana con el usuario 'admin' y contraseña 'admin'."
-            echo "-> http://$TF_ALB_URL:3000"
             echo "=============================================================================="
-
-
 
 - stage: DestroyApproval
   displayName: Approve Destroy Infrastructure
