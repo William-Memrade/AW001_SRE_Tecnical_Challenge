@@ -8,6 +8,12 @@ trigger:
     exclude:
       - 'azure-pipelines/azure-pipeline-terraform.yml'
 
+parameters:
+  - name: DeleteKopsInfrastructure
+    displayName: "🗑️ Eliminar Cluster KOps y Bucket S3"
+    type: boolean
+    default: false
+
 pool: k8s-agents
 name: Deploy Terraform Infrastructure
 
@@ -15,10 +21,13 @@ variables:
   - group: kops-aws-credentials
   - name: working_directory
     value: '$(System.DefaultWorkingDirectory)/terraform'
+  - name: kops_directory
+    value: '$(System.DefaultWorkingDirectory)/kops'
 
 stages:
 - stage: Build
   displayName: Build and Validate Infrastructure
+  condition: eq('${{ parameters.DeleteKopsInfrastructure }}', false)
   jobs:
     - job: validate_infrastructure
       steps:
@@ -63,7 +72,7 @@ stages:
 - stage: Deploy
   displayName: Deploy Infrastructure
   dependsOn: Build
-  condition: succeeded()
+  condition: and(succeeded(), eq('${{ parameters.DeleteKopsInfrastructure }}', false))
   jobs:
     - job: deploy_infrastructure
       steps:
@@ -113,6 +122,7 @@ stages:
 - stage: DestroyApproval
   displayName: Approve Destroy Infrastructure
   dependsOn: Deploy
+  condition: and(succeeded(), eq('${{ parameters.DeleteKopsInfrastructure }}', false))
   jobs:
   - deployment: DestroyApprovalJob
     environment: 'DeploymentApprovers'
@@ -126,7 +136,7 @@ stages:
 - stage: Destroy
   displayName: Destroy Infrastructure
   dependsOn: DestroyApproval
-  condition: succeeded()
+  condition: and(succeeded(), eq('${{ parameters.DeleteKopsInfrastructure }}', false))
   jobs:
     - job: destroy_infrastructure
       displayName: Destroy Infrastructure
@@ -148,3 +158,44 @@ stages:
           script: |
             /usr/local/bin/terraform init
             /usr/local/bin/terraform destroy -auto-approve
+
+- stage: DeleteKopsInfrastructure
+  displayName: "Eliminar Cluster KOps y Bucket S3"
+  dependsOn: []
+  condition: eq('${{ parameters.DeleteKopsInfrastructure }}', true)
+  jobs:
+    - job: delete_kops_infrastructure
+      displayName: Delete KOps Cluster and S3
+      steps:
+      - checkout: self
+        clean: true
+
+      - task: Bash@3
+        displayName: Configure AWS Credentials
+        inputs:
+          targetType: inline
+          script: |
+            aws configure set aws_access_key_id $(AWS_ACCESS_KEY_ID)
+            aws configure set aws_secret_access_key $(AWS_SECRET_ACCESS_KEY)
+            aws configure set default.region $(AWS_REGION)
+
+      - task: Bash@3
+        displayName: Install KOps
+        inputs:
+          targetType: inline
+          script: |
+            curl -Lo /tmp/kops-binary https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | grep tag_name | cut -d '"' -f 4)/kops-linux-amd64
+            chmod +x /tmp/kops-binary
+            sudo mv /tmp/kops-binary /usr/local/bin/kops
+
+      - task: Bash@3
+        displayName: Delete KOps Cluster and S3 Bucket
+        inputs:
+          targetType: inline
+          script: |
+            chmod +x $(kops_directory)/kops-delete-cluster.sh
+            bash $(kops_directory)/kops-delete-cluster.sh
+        env:
+          EKS_CLUSTER_NAME: $(EKS_CLUSTER_NAME)
+          KOPS_STORAGE_BUCKET: $(KOPS_STORAGE_BUCKET)
+          AWS_REGION: $(AWS_REGION)
