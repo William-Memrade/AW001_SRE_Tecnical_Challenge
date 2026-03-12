@@ -1,11 +1,8 @@
-# helm/prometheus-values.yaml
-# Configura kube-prometheus-stack para descubrir y scrapear instancias EC2 de Terraform
+---
 
 prometheus:
   prometheusSpec:
     additionalScrapeConfigs:
-      # EC2 Service Discovery — scrapeará automáticamente todas las instancias
-      # con el tag Name=web-server-asg en la región configurada
       - job_name: 'ec2-terraform-nodes'
         ec2_sd_configs:
           - region: us-east-1
@@ -18,16 +15,12 @@ prometheus:
                 values:
                   - running
         relabel_configs:
-          # Usar la IP pública como target
           - source_labels: [__meta_ec2_public_ip]
             target_label: __address__
             replacement: '${1}:9100'
-          # Añadir la IP pública como label
           - source_labels: [__meta_ec2_public_ip]
             target_label: public_ip
-          # Añadir el instance_id como label
           - source_labels: [__meta_ec2_instance_id]
             target_label: instance_id
-          # Añadir el tag Name como label
           - source_labels: [__meta_ec2_tag_Name]
             target_label: instance_name
