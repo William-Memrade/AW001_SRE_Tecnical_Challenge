@@ -180,7 +180,7 @@ stages:
             aws configure set default.region $(AWS_REGION)
 
       - task: Bash@3
-        displayName: Install KOps
+        displayName: Delete KOps Cluster and S3 Bucket
         inputs:
           targetType: inline
           script: |
@@ -188,11 +188,6 @@ stages:
             chmod +x /tmp/kops-binary
             sudo mv /tmp/kops-binary /usr/local/bin/kops
 
-      - task: Bash@3
-        displayName: Delete KOps Cluster and S3 Bucket
-        inputs:
-          targetType: inline
-          script: |
             chmod +x $(kops_directory)/kops-delete-cluster.sh
             bash $(kops_directory)/kops-delete-cluster.sh
         env:
