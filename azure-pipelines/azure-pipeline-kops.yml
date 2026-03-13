@@ -32,9 +32,9 @@ stages:
         inputs:
           targetType: 'inline'
           script: |
-            sudo yum update -y
-            sudo yum install -y python3-pip
-            pip3 install yamllint --user
+            sudo apt-get update -y
+            sudo apt-get install -y python3-pip python3
+            pip3 install yamllint --user || pip3 install yamllint --break-system-packages
 
             curl -LO https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl
             chmod +x kubectl
