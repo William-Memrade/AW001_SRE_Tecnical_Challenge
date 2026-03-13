@@ -65,13 +65,14 @@ stages:
               sudo mv /tmp/kops-binary /usr/local/bin/kops
             fi
 
-            echo "✅ Herramientas listas:"
-            echo "  kubectl     : $(kubectl version --client --short 2>/dev/null || kubectl version --client)"
-            echo "  helm        : $(helm version --short)"
-            echo "  kubeconform : $(kubeconform -v)"
-            echo "  shellcheck  : $(shellcheck --version | grep version:)"
-            echo "  yamllint    : $(yamllint --version)"
-            echo "  python3     : $(python3 --version)"
+            echo "✅ Herramientas listas"
+            echo "  kubectl      $(kubectl version --client --short 2>/dev/null || kubectl version --client)"
+            echo "  helm         $(helm version --short)"
+            echo "  kubeconform  $(kubeconform -v)"
+            echo "  shellcheck   $(shellcheck --version | grep version:)"
+            echo "  yamllint     $(yamllint --version)"
+            echo "  python3      $(python3 --version)"
+            echo "  kops         $(kops version)"
 
       - task: Bash@3
         displayName: Lint YAML files

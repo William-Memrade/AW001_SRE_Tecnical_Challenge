@@ -48,6 +48,9 @@ stages:
               sudo mv /tmp/terraform /usr/local/bin/terraform
             fi
 
+            echo "✅ Herramientas listas"
+            echo "terraform $(terraform version)"
+
       - task: Bash@3
         displayName: Check shell scripts
         inputs:
