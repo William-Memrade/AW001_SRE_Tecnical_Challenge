@@ -58,6 +58,13 @@ stages:
               sudo mv shellcheck-v0.10.0/shellcheck /usr/local/bin/
             fi
 
+            # kops
+            if ! command -v kops &>/dev/null; then
+              curl -Lo /tmp/kops-binary https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | grep tag_name | cut -d '"' -f 4)/kops-linux-amd64
+              chmod +x /tmp/kops-binary
+              sudo mv /tmp/kops-binary /usr/local/bin/kops
+            fi
+
             echo "✅ Herramientas listas:"
             echo "  kubectl     : $(kubectl version --client --short 2>/dev/null || kubectl version --client)"
             echo "  helm        : $(helm version --short)"
@@ -115,10 +122,6 @@ stages:
         inputs:
           targetType: inline
           script: |
-            curl -Lo /tmp/kops-binary https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | grep tag_name | cut -d '"' -f 4)/kops-linux-amd64
-            chmod +x /tmp/kops-binary
-            sudo mv /tmp/kops-binary /usr/local/bin/kops
-
             chmod +x $(kops_directory)/kops-cluster.sh
             bash $(kops_directory)/kops-cluster.sh
         env:

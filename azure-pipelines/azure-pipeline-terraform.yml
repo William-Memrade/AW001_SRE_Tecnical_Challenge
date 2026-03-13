@@ -179,10 +179,6 @@ stages:
         inputs:
           targetType: inline
           script: |
-            curl -Lo /tmp/kops-binary https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | grep tag_name | cut -d '"' -f 4)/kops-linux-amd64
-            chmod +x /tmp/kops-binary
-            sudo mv /tmp/kops-binary /usr/local/bin/kops
-
             chmod +x $(kops_directory)/kops-delete-cluster.sh
             bash $(kops_directory)/kops-delete-cluster.sh
         env:
