@@ -1,0 +1,8 @@
+---
+
+prometheus:
+  prometheusSpec:
+    additionalScrapeConfigsSecret:
+      enabled: true
+      name: prometheus-ec2-scrape-config
+      key: scrape-config.yaml

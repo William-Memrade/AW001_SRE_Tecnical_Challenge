@@ -1,0 +1,206 @@
+trigger:
+  branches:
+    include:
+      - master
+      - release
+      - develop
+  paths:
+    exclude:
+      - 'azure-pipelines/azure-pipeline-terraform.yml'
+
+parameters:
+  - name: DeleteKopsInfrastructure
+    displayName: "🗑️ Eliminar Cluster KOps y Bucket S3"
+    type: boolean
+    default: false
+
+pool: k8s-agents
+name: Deploy Terraform Infrastructure
+
+variables:
+  - group: kops-aws-credentials
+  - name: terraform_dir
+    value: '$(System.DefaultWorkingDirectory)/pregunta4/Seccion1/terraform'
+  - name: kops_directory
+    value: '$(System.DefaultWorkingDirectory)/pregunta1/Seccion1/kops'
+
+stages:
+- stage: Build
+  displayName: Build and Validate Infrastructure
+  condition: eq('${{ parameters.DeleteKopsInfrastructure }}', false)
+  jobs:
+    - job: validate_infrastructure
+      steps:
+      - checkout: self
+        clean: true
+
+      - task: Bash@3
+        displayName: Install dependencies
+        inputs:
+          targetType: 'inline'
+          script: |
+            sudo apt-get update -y
+
+            if ! command -v terraform &>/dev/null; then
+              curl -fsSL https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip -o /tmp/terraform.zip
+              cd /tmp && unzip -q -o terraform.zip
+              sudo rm -rf /usr/local/bin/terraform
+              sudo mv /tmp/terraform /usr/local/bin/terraform
+            fi
+
+            echo "✅ Herramientas listas"
+            echo "terraform $(terraform version)"
+
+      - task: Bash@3
+        displayName: Check shell scripts
+        inputs:
+          targetType: 'inline'
+          script: |
+            shellcheck $(terraform_dir)/scripts/*.sh || true
+
+      - task: Bash@3
+        displayName: Validate Terraform code
+        inputs:
+          targetType: 'inline'
+          workingDirectory: '$(terraform_dir)'
+          script: |
+            /usr/local/bin/terraform init -backend=false
+            /usr/local/bin/terraform validate
+
+- stage: Deploy
+  displayName: Deploy Infrastructure
+  dependsOn: Build
+  condition: and(succeeded(), eq('${{ parameters.DeleteKopsInfrastructure }}', false))
+  jobs:
+    - job: deploy_infrastructure
+      steps:
+      # - task: Bash@3
+      #   displayName: Configure AWS Credentials
+      #   inputs:
+      #     targetType: inline
+      #     script: |
+      #       aws configure set aws_access_key_id $(AWS_ACCESS_KEY_ID)
+      #       aws configure set aws_secret_access_key $(AWS_SECRET_ACCESS_KEY)
+      #       aws configure set default.region $(AWS_REGION)
+
+      - task: AWSCLI@1
+        displayName: Assume AWS Identity
+        inputs:
+          awsCredentials: '$(SVC_TC_AWS)'
+          regionName: '$(AWS_REGION)'
+          awsCommand: 'sts'
+          awsSubCommand: 'get-caller-identity'
+
+      - task: Bash@3
+        displayName: Planning Terraform Infrastructure
+        inputs:
+          targetType: inline
+          workingDirectory: '$(terraform_dir)'
+          script: |
+            /usr/local/bin/terraform init
+            /usr/local/bin/terraform plan -out=tfplan
+
+      - task: Bash@3
+        displayName: Deploy Terraform Infrastructure
+        inputs:
+          targetType: inline
+          workingDirectory: '$(terraform_dir)'
+          script: |
+            /usr/local/bin/terraform apply -auto-approve tfplan
+
+      - task: Bash@3
+        displayName: Print Public URLs
+        inputs:
+          targetType: inline
+          script: |
+            echo "=============================================================================="
+            echo "🎉 DESPLIEGUES DE TERRAFORM FINALIZADOS CON ÉXITO 🎉"
+            echo "=============================================================================="
+            echo "Extrayendo URL pública del AWS Elastic Load Balancer..."
+            
+            cd $(terraform_dir)
+            TF_ALB_URL=$(/usr/local/bin/terraform output -raw alb_dns_name)
+
+            echo "🌐 Nginx Application"
+            echo "-> http://$TF_ALB_URL"
+            echo "=============================================================================="
+
+- stage: DestroyApproval
+  displayName: Approve Destroy Infrastructure
+  dependsOn: Deploy
+  condition: and(succeeded(), eq('${{ parameters.DeleteKopsInfrastructure }}', false))
+  jobs:
+  - deployment: DestroyApprovalJob
+    environment: 'DeploymentApprovers'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - script: echo "Esperando aprobación para continuar con el destroy..."
+            displayName: 'Approval Step'
+
+- stage: Destroy
+  displayName: Destroy Infrastructure
+  dependsOn: DestroyApproval
+  condition: and(succeeded(), eq('${{ parameters.DeleteKopsInfrastructure }}', false))
+  jobs:
+    - job: destroy_infrastructure
+      displayName: Destroy Infrastructure
+      steps:
+      # - task: Bash@3
+      #   displayName: Configure AWS Credentials
+      #   inputs:
+      #     targetType: inline
+      #     script: |
+      #       aws configure set aws_access_key_id $(AWS_ACCESS_KEY_ID)
+      #       aws configure set aws_secret_access_key $(AWS_SECRET_ACCESS_KEY)
+      #       aws configure set default.region $(AWS_REGION)
+
+      - task: AWSCLI@1
+        displayName: Assume AWS Identity
+        inputs:
+          awsCredentials: '$(SVC_TC_AWS)'
+          regionName: '$(AWS_REGION)'
+          awsCommand: 'sts'
+          awsSubCommand: 'get-caller-identity'
+
+      - task: Bash@3
+        displayName: Destroy Terraform Infrastructure
+        inputs:
+          targetType: inline
+          workingDirectory: '$(terraform_dir)'
+          script: |
+            /usr/local/bin/terraform init
+            /usr/local/bin/terraform destroy -auto-approve
+
+- stage: DeleteKopsInfrastructure
+  displayName: "Eliminar Cluster KOps y Bucket S3"
+  dependsOn: []
+  condition: eq('${{ parameters.DeleteKopsInfrastructure }}', true)
+  jobs:
+    - job: delete_kops_infrastructure
+      displayName: Delete KOps Cluster and S3
+      steps:
+      - checkout: self
+        clean: true
+
+      - task: Bash@3
+        displayName: Configure AWS Credentials
+        inputs:
+          targetType: inline
+          script: |
+            aws configure set aws_access_key_id $(AWS_ACCESS_KEY_ID)
+            aws configure set aws_secret_access_key $(AWS_SECRET_ACCESS_KEY)
+            aws configure set default.region $(AWS_REGION)
+
+      - task: Bash@3
+        displayName: Delete KOps Cluster and S3 Bucket
+        inputs:
+          targetType: inline
+          script: |
+            chmod +x $(kops_directory)/kops-delete-cluster.sh
+            bash $(kops_directory)/kops-delete-cluster.sh
+        env:
+          KOPS_CLUSTER_NAME: $(KOPS_CLUSTER_NAME)
+          KOPS_STORAGE_BUCKET: $(KOPS_STORAGE_BUCKET)
+          AWS_REGION: $(AWS_REGION)

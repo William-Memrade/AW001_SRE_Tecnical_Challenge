@@ -1,7 +1,9 @@
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: nginx-index-html
+  namespace: memrade-frontend
   labels:
     app: hello-kops
 data:
@@ -12,7 +14,11 @@ data:
       <meta charset="UTF-8">
       <title>Hola Mundo</title>
       <style>
-        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+        body {
+          font-family: Arial, sans-serif;
+          text-align: center;
+          margin-top: 50px;
+        }
       </style>
     </head>
     <body>

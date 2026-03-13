@@ -1,1 +1,38 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+*.tfplan
+*.tfrun
+.terraform.lock.hcl
+
+# KOps
+cluster-config.yaml
+cluster-config-update.yaml
+kubeconfig
+.kops/
+
+# Kubernetes
+.kube/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+migrate.py
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Project specific
+*Evidencias/*
+!pregunta1/Evidencias/.gitkeep
+!pregunta2/Evidencias/.gitkeep
+!pregunta3/Evidencias/.gitkeep
+!pregunta4/Evidencias/.gitkeep
+!pregunta5/Evidencias/.gitkeep
 *.pdf

@@ -1,0 +1,42 @@
+---
+# helm/values-nginx.yaml
+
+replicaCount: 2
+
+resources:
+  requests:
+    cpu: "10m"
+    memory: "64Mi"
+  limits:
+    cpu: "100m"
+    memory: "128Mi"
+
+serverBlock: |-
+  server {
+    listen 0.0.0.0:8080;
+    location / {
+      default_type text/html;
+      return 200 '<!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Hola Mundo</title>
+        </head>
+        <body>
+          <h1>Hola Mundo me gusta jugar con kubernetes</h1>
+        </body>
+      </html>';
+    }
+  }
+
+# Exponer el servicio nginx al exterior a través del puerto 80
+service:
+  type: LoadBalancer
+  port: 80
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    namespace: observability
+    interval: 10s
