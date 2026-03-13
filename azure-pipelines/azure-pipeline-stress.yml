@@ -1,0 +1,64 @@
+parameters:
+  - name: K8S_MANUAL_URL
+    displayName: "URL Nginx (Manifiestos K8s)"
+    type: string
+    default: ""
+  - name: HELM_URL
+    displayName: "URL Nginx (Helm Chart)"
+    type: string
+    default: ""
+  - name: TERRAFORM_URL
+    displayName: "URL ALB (Terraform Fleet)"
+    type: string
+    default: ""
+  - name: RPS
+    displayName: "Peticiones por segundo POR URL"
+    type: number
+    default: 10
+  - name: DURATION
+    displayName: "Duración de la prueba (segundos)"
+    type: number
+    default: 180
+
+trigger: none # Manual trigger only
+
+pool: k8s-agents
+
+jobs:
+- job: StressTest
+  displayName: "Ejecutando Prueba de Estrés"
+  steps:
+  - checkout: self
+  
+  - task: Bash@3
+    displayName: "Configurar Permisos del Script"
+    inputs:
+      targetType: 'inline'
+      script: |
+        chmod +x $(System.DefaultWorkingDirectory)/scripts/stress-test.sh
+
+  - task: Bash@3
+    displayName: "Ejecutar Estrés Multitarget"
+    inputs:
+      targetType: 'inline'
+      script: |
+        SCRIPT="$(System.DefaultWorkingDirectory)/scripts/stress-test.sh"
+        
+        if [ -n "${{ parameters.K8S_MANUAL_URL }}" ]; then
+          echo "🔥 Estresando K8s Manual..."
+          $SCRIPT "${{ parameters.K8S_MANUAL_URL }}" ${{ parameters.RPS }} ${{ parameters.DURATION }} &
+        fi
+
+        if [ -n "${{ parameters.HELM_URL }}" ]; then
+          echo "🔥 Estresando Helm Nginx..."
+          $SCRIPT "${{ parameters.HELM_URL }}" ${{ parameters.RPS }} ${{ parameters.DURATION }} &
+        fi
+
+        if [ -n "${{ parameters.TERRAFORM_URL }}" ]; then
+          echo "🔥 Estresando Terraform Fleet..."
+          $SCRIPT "${{ parameters.TERRAFORM_URL }}" ${{ parameters.RPS }} ${{ parameters.DURATION }} &
+        fi
+        
+        echo "⏳ Esperando a que terminen todas las pruebas..."
+        wait
+        echo "✅ Todas las pruebas de carga han finalizado."
