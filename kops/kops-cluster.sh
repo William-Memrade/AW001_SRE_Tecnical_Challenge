@@ -2,7 +2,7 @@
 set -euo pipefail
 
 echo "=============================================================================="
-echo " AWS - Gestionando el cluster: $EKS_CLUSTER_NAME"
+echo " AWS - Gestionando el cluster: $KOPS_CLUSTER_NAME"
 echo "=============================================================================="
 
 # 1. Validar si existe el Bucket para no fallar
@@ -13,18 +13,18 @@ if ! aws s3api head-bucket --bucket "${KOPS_STORAGE_BUCKET}" 2>/dev/null; then
 fi
 
 # 2. Validar si el clúster ya existe
-if kops get cluster --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" > /dev/null 2>&1; then
+if kops get cluster --name "$KOPS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" > /dev/null 2>&1; then
     echo "=========================================="
     echo "El clúster ya existe. Ejecutando UPDATE..."
     echo "=========================================="
     
-    kops get cluster --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" -o yaml > cluster-config-update.yaml
+    kops get cluster --name "$KOPS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" -o yaml > cluster-config-update.yaml
     
     pip3 install pyyaml || true
     python3 $(dirname "$0")/remove_kops_lb.py cluster-config-update.yaml
     
     kops replace -f cluster-config-update.yaml --state "s3://$KOPS_STORAGE_BUCKET" --force
-    kops update cluster --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" --yes --admin
+    kops update cluster --name "$KOPS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" --yes --admin
 
 else
     echo "=========================================="
@@ -32,7 +32,7 @@ else
     echo "=========================================="
 
     kops create cluster \
-        --name "$EKS_CLUSTER_NAME" \
+        --name "$KOPS_CLUSTER_NAME" \
         --state "s3://$KOPS_STORAGE_BUCKET" \
         --zones "$AWS_ZONES" \
         --control-plane-size "t3.small" \
@@ -52,7 +52,7 @@ else
 
     echo "Aplicando configuración modificada..."
     kops replace -f cluster-config.yaml --state "s3://$KOPS_STORAGE_BUCKET" --force
-    kops update cluster --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" --yes --admin
+    kops update cluster --name "$KOPS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" --yes --admin
 fi
 
 echo "=============================================================================="
@@ -63,7 +63,7 @@ while [ $n -le 15 ]; do
     # Búsqueda a prueba de fallas usando Security Groups
     SG_MASTER_ID=$(aws ec2 describe-security-groups \
         --region "$AWS_REGION" \
-        --filters "Name=group-name,Values=masters.$EKS_CLUSTER_NAME" \
+        --filters "Name=group-name,Values=masters.$KOPS_CLUSTER_NAME" \
         --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || echo "None")
         
     if [ "$SG_MASTER_ID" != "None" ] && [ -n "$SG_MASTER_ID" ]; then
@@ -75,8 +75,8 @@ while [ $n -le 15 ]; do
             
         if [ -n "${MASTER_IP:-}" ] && [ "$MASTER_IP" != "None" ]; then
             echo "IP del Control Plane encontrada: $MASTER_IP"
-            sudo sed -i "/api\.$EKS_CLUSTER_NAME/d" /etc/hosts || true
-            echo "$MASTER_IP api.$EKS_CLUSTER_NAME" | sudo tee -a /etc/hosts
+            sudo sed -i "/api\.$KOPS_CLUSTER_NAME/d" /etc/hosts || true
+            echo "$MASTER_IP api.$KOPS_CLUSTER_NAME" | sudo tee -a /etc/hosts
             break
         fi
     fi
@@ -87,10 +87,10 @@ while [ $n -le 15 ]; do
 done
 
 echo "Esperando validación completa de KOps (esto tardará unos minutos)..."
-kops validate cluster --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" --wait 15m
+kops validate cluster --name "$KOPS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" --wait 15m
 
 echo "Exportando kubeconfig..."
-kops export kubeconfig --name "$EKS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" --admin
+kops export kubeconfig --name "$KOPS_CLUSTER_NAME" --state "s3://$KOPS_STORAGE_BUCKET" --admin
 
 echo "Validando nodos..."
 kubectl get nodes -o wide

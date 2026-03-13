@@ -74,14 +74,22 @@ stages:
   jobs:
     - job: deploy_infrastructure
       steps:
-      - task: Bash@3
-        displayName: Configure AWS Credentials
+      # - task: Bash@3
+      #   displayName: Configure AWS Credentials
+      #   inputs:
+      #     targetType: inline
+      #     script: |
+      #       aws configure set aws_access_key_id $(AWS_ACCESS_KEY_ID)
+      #       aws configure set aws_secret_access_key $(AWS_SECRET_ACCESS_KEY)
+      #       aws configure set default.region $(AWS_REGION)
+
+      - task: AWSCLI@1
+        displayName: Assume AWS Identity
         inputs:
-          targetType: inline
-          script: |
-            aws configure set aws_access_key_id $(AWS_ACCESS_KEY_ID)
-            aws configure set aws_secret_access_key $(AWS_SECRET_ACCESS_KEY)
-            aws configure set default.region $(AWS_REGION)
+          awsCredentials: '$(SVC_TC_AWS)'
+          regionName: '$(AWS_REGION)'
+          awsCommand: 'sts'
+          awsSubCommand: 'get-caller-identity'
 
       - task: Bash@3
         displayName: Planning Terraform Infrastructure
@@ -139,14 +147,22 @@ stages:
     - job: destroy_infrastructure
       displayName: Destroy Infrastructure
       steps:
-      - task: Bash@3
-        displayName: Configure AWS Credentials
+      # - task: Bash@3
+      #   displayName: Configure AWS Credentials
+      #   inputs:
+      #     targetType: inline
+      #     script: |
+      #       aws configure set aws_access_key_id $(AWS_ACCESS_KEY_ID)
+      #       aws configure set aws_secret_access_key $(AWS_SECRET_ACCESS_KEY)
+      #       aws configure set default.region $(AWS_REGION)
+
+      - task: AWSCLI@1
+        displayName: Assume AWS Identity
         inputs:
-          targetType: inline
-          script: |
-            aws configure set aws_access_key_id $(AWS_ACCESS_KEY_ID)
-            aws configure set aws_secret_access_key $(AWS_SECRET_ACCESS_KEY)
-            aws configure set default.region $(AWS_REGION)
+          awsCredentials: '$(SVC_TC_AWS)'
+          regionName: '$(AWS_REGION)'
+          awsCommand: 'sts'
+          awsSubCommand: 'get-caller-identity'
 
       - task: Bash@3
         displayName: Destroy Terraform Infrastructure
@@ -185,6 +201,6 @@ stages:
             chmod +x $(kops_directory)/kops-delete-cluster.sh
             bash $(kops_directory)/kops-delete-cluster.sh
         env:
-          EKS_CLUSTER_NAME: $(EKS_CLUSTER_NAME)
+          KOPS_CLUSTER_NAME: $(KOPS_CLUSTER_NAME)
           KOPS_STORAGE_BUCKET: $(KOPS_STORAGE_BUCKET)
           AWS_REGION: $(AWS_REGION)

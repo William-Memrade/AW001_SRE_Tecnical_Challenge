@@ -109,14 +109,22 @@ stages:
   jobs:
     - job: deploy_infrastructure
       steps:
-      - task: Bash@3
-        displayName: Configure AWS Credentials
+      # - task: Bash@3
+      #   displayName: Configure AWS Credentials
+      #   inputs:
+      #     targetType: inline
+      #     script: |
+      #       aws configure set aws_access_key_id $(AWS_ACCESS_KEY_ID)
+      #       aws configure set aws_secret_access_key $(AWS_SECRET_ACCESS_KEY)
+      #       aws configure set default.region $(AWS_REGION)
+
+      - task: AWSCLI@1
+        displayName: Assume AWS Identity
         inputs:
-          targetType: inline
-          script: |
-            aws configure set aws_access_key_id $(AWS_ACCESS_KEY_ID)
-            aws configure set aws_secret_access_key $(AWS_SECRET_ACCESS_KEY)
-            aws configure set default.region $(AWS_REGION)
+          awsCredentials: '$(SVC_TC_AWS)'
+          regionName: '$(AWS_REGION)'
+          awsCommand: 'sts'
+          awsSubCommand: 'get-caller-identity'
 
       - task: Bash@3
         displayName: Create Kops Cluster
@@ -126,7 +134,7 @@ stages:
             chmod +x $(kops_directory)/kops-cluster.sh
             bash $(kops_directory)/kops-cluster.sh
         env:
-          EKS_CLUSTER_NAME: $(EKS_CLUSTER_NAME)
+          KOPS_CLUSTER_NAME: $(KOPS_CLUSTER_NAME)
           KOPS_STORAGE_BUCKET: $(KOPS_STORAGE_BUCKET)
           AWS_REGION: $(AWS_REGION)
           AWS_ZONES: $(AWS_ZONES)
@@ -137,7 +145,7 @@ stages:
           targetType: inline
           script: |
             # Exportar el S3
-            kops export kubeconfig --admin --name $(EKS_CLUSTER_NAME) --state s3://$(KOPS_STORAGE_BUCKET)
+            kops export kubeconfig --admin --name $(KOPS_CLUSTER_NAME) --state s3://$(KOPS_STORAGE_BUCKET)
 
       - task: Bash@3
         displayName: Deploy to Kubernetes (EKS - Manifestos)
@@ -195,6 +203,8 @@ stages:
               -f $(working_directory)/helm/prometheus-values.yaml \
               --set grafana.service.type=LoadBalancer \
               --set grafana.adminPassword=admin \
+              --set prometheus.service.type=LoadBalancer \
+              --set alertmanager.service.type=LoadBalancer \
               --set "grafana.additionalDataSources[0].name=Loki" \
               --set "grafana.additionalDataSources[0].type=loki" \
               --set "grafana.additionalDataSources[0].url=http://loki.observability.svc.cluster.local:3100"
@@ -213,14 +223,14 @@ stages:
             
             echo "Installing OpenTelemetry Collector..."
             helm upgrade --install otel-collector open-telemetry/opentelemetry-collector \
-              --namespace observability -f $(working_directory)/helm/otel-values.yaml
+              --namespace observability -f $(working_directory)/helm/otel-values.yaml \
+              --set service.type=LoadBalancer
 
       - task: Bash@3
         displayName: Deploy Nginx with Helm
         inputs:
           targetType: inline
           script: |
-            # Los CRDs de Prometheus (ServiceMonitor) ya están instalados por el step anterior
             helm upgrade --install nginx oci://registry-1.docker.io/bitnamicharts/nginx \
               -f $(working_directory)/helm/values-nginx.yaml \
               --namespace memrade-frontend \
@@ -263,6 +273,63 @@ stages:
             done
             echo "Accede a Grafana con el usuario 'admin' y contraseña 'admin'."
             echo "-> http://$GRAFANA_URL"
+
+            echo "📊 URL 4: Prometheus (Métricas y Targets)"
+            PROM_URL=""
+            while [ -z "$PROM_URL" ] || [ "$PROM_URL" = "<pending>" ]; do
+              echo "Esperando a que AWS asigne el DNS para Prometheus... (esto puede tardar 2-3 min)"
+              sleep 10
+              PROM_URL=$(kubectl get svc kube-prometheus-stack-prometheus -n observability -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            done
+            echo "-> http://$PROM_URL:9090"
+            echo "-> http://$PROM_URL:9090/targets  (ver estado de los nodos)"
+
+            echo "🔭 URL 5: OpenTelemetry Collector"
+            OTEL_URL=""
+            while [ -z "$OTEL_URL" ] || [ "$OTEL_URL" = "<pending>" ]; do
+              echo "Esperando a que AWS asigne el DNS para OTel Collector... (esto puede tardar 2-3 min)"
+              sleep 10
+              OTEL_URL=$(kubectl get svc otel-collector-opentelemetry-collector -n observability -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            done
+
+            echo "Testing OpenTelemetry endpoint: http://$OTEL_URL:4318/v1/traces"
+            NOW=$(date +%s%N)
+            curl -X POST http://$OTEL_URL:4318/v1/traces \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"resourceSpans\":[{
+                \"resource\":{
+                  \"attributes\":[
+                    {\"key\":\"service.name\",\"value\":{\"stringValue\":\"demo-service\"}}
+                  ]
+                },
+                \"scopeSpans\":[{
+                  \"spans\":[{
+                    \"traceId\":\"5B8EFFF798038103D269B633813FC60C\",
+                    \"spanId\":\"EEE19B7EC3C1B174\",
+                    \"name\":\"demo-span\",
+                    \"kind\":1,
+                    \"startTimeUnixNano\":\"$NOW\",
+                    \"endTimeUnixNano\":\"$NOW\"
+                  }]
+                }]
+              }]
+            }"
+
+            if [ "$response" = "200" ]; then
+              echo "✅ OpenTelemetry Collector is working"
+            else
+              echo "❌ OpenTelemetry Collector is not working (HTTP $response)"
+            fi
+
+            echo "🔔 URL 6: Alertmanager"
+            AM_URL=""
+            while [ -z "$AM_URL" ] || [ "$AM_URL" = "<pending>" ]; do
+              echo "Esperando a que AWS asigne el DNS para Alertmanager... (esto puede tardar 2-3 min)"
+              sleep 10
+              AM_URL=$(kubectl get svc kube-prometheus-stack-alertmanager -n observability -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            done
+            echo "-> http://$AM_URL:9093"
             echo "=============================================================================="
 
 - stage: DestroyApproval
@@ -286,14 +353,22 @@ stages:
     - job: destroy_infrastructure
       displayName: Destroy Infrastructure
       steps:
-      - task: Bash@3
-        displayName: Configure AWS Credentials
+      # - task: Bash@3
+      #   displayName: Configure AWS Credentials
+      #   inputs:
+      #     targetType: inline
+      #     script: |
+      #       aws configure set aws_access_key_id $(AWS_ACCESS_KEY_ID)
+      #       aws configure set aws_secret_access_key $(AWS_SECRET_ACCESS_KEY)
+      #       aws configure set default.region $(AWS_REGION)
+
+      - task: AWSCLI@1
+        displayName: Assume AWS Identity
         inputs:
-          targetType: inline
-          script: |
-            aws configure set aws_access_key_id $(AWS_ACCESS_KEY_ID)
-            aws configure set aws_secret_access_key $(AWS_SECRET_ACCESS_KEY)
-            aws configure set default.region $(AWS_REGION)
+          awsCredentials: '$(SVC_TC_AWS)'
+          regionName: '$(AWS_REGION)'
+          awsCommand: 'sts'
+          awsSubCommand: 'get-caller-identity'
 
       - task: Bash@3
         displayName: Destroy Helm Releases and Namespaces
@@ -301,7 +376,7 @@ stages:
           targetType: inline
           script: |
             echo "Conectándose al clúster para limpieza controlada..."
-            kops export kubeconfig --admin --name $(EKS_CLUSTER_NAME) --state s3://$(KOPS_STORAGE_BUCKET) || echo "No se pudo obtener kubeconfig, omitiendo..."
+            kops export kubeconfig --admin --name $(KOPS_CLUSTER_NAME) --state s3://$(KOPS_STORAGE_BUCKET) || echo "No se pudo obtener kubeconfig, omitiendo..."
 
             echo "--- Desinstalando Helm Releases de la aplicación ---"
             helm uninstall nginx --namespace memrade-frontend || true
@@ -310,11 +385,18 @@ stages:
             kubectl delete namespace memrade-frontend --wait=false || true
             kubectl get namespace memrade-frontend -o json 2>/dev/null | tr -d "\n" | sed "s/\"finalizers\": \[[^]]\+\]/\"finalizers\": []/" | kubectl replace --raw /api/v1/namespaces/memrade-frontend/finalize -f - || true
 
+            echo "--- Desinstalando Helm Releases de observabilidad ---"
+            helm uninstall kube-prometheus-stack --namespace observability || true
+            helm uninstall otel-collector --namespace observability || true
+            helm uninstall loki --namespace observability || true
+            helm uninstall tempo --namespace observability || true
+
+            echo "--- Eliminando namespace observability (forzando si hay finalizers) ---"
+            kubectl delete namespace observability --wait=false || true
+            kubectl get namespace observability -o json 2>/dev/null | tr -d "\n" | sed "s/\"finalizers\": \[[^]]\+\]/\"finalizers\": []/" | kubectl replace --raw /api/v1/namespaces/observability/finalize -f - || true
+
             echo "--- Limpieza completada. ---"
             echo "    ✅ namespace memrade-frontend eliminado"
+            echo "    ✅ namespace observability eliminado (Grafana, Prometheus, Loki, OTel, Alertmanager)"
+            echo "    ✅ Todos los LoadBalancers liberados"
             echo "    ✅ El cluster KOps y el bucket S3 se mantienen intactos"
-            echo "    ✅ namespace observability (Grafana, Prometheus, Loki) sigue activo"
-        env:
-          EKS_CLUSTER_NAME: $(EKS_CLUSTER_NAME)
-          KOPS_STORAGE_BUCKET: $(KOPS_STORAGE_BUCKET)
-

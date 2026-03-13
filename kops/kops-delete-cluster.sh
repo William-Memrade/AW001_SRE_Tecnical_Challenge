@@ -7,17 +7,17 @@ set -e
 # ==============================================================================
 
 echo "=============================================================================="
-echo " AWS Free Tier - Eliminando el cluster: $EKS_CLUSTER_NAME"
+echo " AWS Free Tier - Eliminando el cluster: $KOPS_CLUSTER_NAME"
 echo "=============================================================================="
 
 # 1. Eliminar el cluster de KOps
-if kops get cluster --name "${EKS_CLUSTER_NAME}" --state="s3://${KOPS_STORAGE_BUCKET}" > /dev/null 2>&1; then
+if kops get cluster --name "${KOPS_CLUSTER_NAME}" --state="s3://${KOPS_STORAGE_BUCKET}" > /dev/null 2>&1; then
     echo "1. Eliminando el cluster de KOps (EC2, VPC, EBS, etc.)..."
 
-    kops delete cluster --name ${EKS_CLUSTER_NAME} --state="s3://${KOPS_STORAGE_BUCKET}" --yes
+    kops delete cluster --name ${KOPS_CLUSTER_NAME} --state="s3://${KOPS_STORAGE_BUCKET}" --yes
     echo "Cluster de Kubernetes eliminado correctamente."
 else
-    echo "1. El cluster $EKS_CLUSTER_NAME no fue encontrado en KOps o ya fue eliminado."
+    echo "1. El cluster $KOPS_CLUSTER_NAME no fue encontrado en KOps o ya fue eliminado."
 fi
 
 # 2. Eliminar el bucket S3 (opcional, pero sugerido para evitar gastos de almacenamiento)
@@ -48,7 +48,7 @@ else
 fi
 
 echo "3. Limpiando entradas locales del proxy de /etc/hosts..."
-sudo sed -i "/api\.$EKS_CLUSTER_NAME/d" /etc/hosts || true
+sudo sed -i "/api\.$KOPS_CLUSTER_NAME/d" /etc/hosts || true
 
 echo "=============================================================================="
 echo " PROCESO DE ELIMINACIÓN COMPLETADO."
