@@ -132,7 +132,7 @@ stages:
 - stage: Destroy
   displayName: Destroy Infrastructure
   dependsOn: DestroyApproval
-  condition: and(succeeded(), eq('${{ parameters.DeleteKopsInfrastructure }}', false))
+  condition: and(succeededOrFailed(), eq('${{ parameters.DeleteKopsInfrastructure }}', false))
   jobs:
     - job: destroy_infrastructure
       displayName: Destroy Infrastructure

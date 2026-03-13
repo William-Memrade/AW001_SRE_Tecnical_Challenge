@@ -304,7 +304,7 @@ stages:
 - stage: Destroy
   displayName: Destroy Infrastructure
   dependsOn: DestroyApproval
-  condition: succeeded()
+  condition: succeededOrFailed()
   jobs:
     - job: destroy_infrastructure
       displayName: Destroy Infrastructure
