@@ -290,6 +290,7 @@ stages:
 
 - stage: DestroyApproval
   displayName: Approve Destroy Infrastructure
+  condition: always()
   jobs:
   - deployment: DestroyApprovalJob
     environment: 'DeploymentApprovers'
