@@ -136,6 +136,7 @@ stages:
   jobs:
     - job: destroy_infrastructure
       displayName: Destroy Infrastructure
+      condition: always()
       steps:
       - task: AWSCLI@1
         displayName: Assume AWS Identity
