@@ -23,283 +23,283 @@ variables:
     value: '$(System.DefaultWorkingDirectory)/pregunta5/Seccion1'
 
 stages:
-- stage: Build
-  displayName: Build and Validate Infrastructure
-  jobs:
-    - job: validate_infrastructure
-      steps:
-      - checkout: self
-        clean: true
+# - stage: Build
+#   displayName: Build and Validate Infrastructure
+#   jobs:
+#     - job: validate_infrastructure
+#       steps:
+#       - checkout: self
+#         clean: true
 
-      - task: Bash@3
-        displayName: Install dependencies
-        inputs:
-          targetType: 'inline'
-          script: |
-            sudo apt-get update -y
-            sudo apt-get install -y python3-pip python3
-            pip3 install yamllint --break-system-packages 2>/dev/null || pip3 install yamllint --user
+#       - task: Bash@3
+#         displayName: Install dependencies
+#         inputs:
+#           targetType: 'inline'
+#           script: |
+#             sudo apt-get update -y
+#             sudo apt-get install -y python3-pip python3
+#             pip3 install yamllint --break-system-packages 2>/dev/null || pip3 install yamllint --user
 
-            if ! command -v kubectl &>/dev/null; then
-              curl -LO https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl
-              chmod +x kubectl
-              sudo mv kubectl /usr/local/bin/
-            fi
+#             if ! command -v kubectl &>/dev/null; then
+#               curl -LO https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl
+#               chmod +x kubectl
+#               sudo mv kubectl /usr/local/bin/
+#             fi
 
-            if ! command -v helm &>/dev/null; then
-              curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-            fi
+#             if ! command -v helm &>/dev/null; then
+#               curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+#             fi
 
-            if ! command -v kubeconform &>/dev/null; then
-              curl -L https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz -o /tmp/kubeconform.tar.gz
-              tar -xzf /tmp/kubeconform.tar.gz -C /tmp/
-              sudo mv /tmp/kubeconform /usr/local/bin/
-            fi
+#             if ! command -v kubeconform &>/dev/null; then
+#               curl -L https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz -o /tmp/kubeconform.tar.gz
+#               tar -xzf /tmp/kubeconform.tar.gz -C /tmp/
+#               sudo mv /tmp/kubeconform /usr/local/bin/
+#             fi
 
-            if ! command -v shellcheck &>/dev/null; then
-              curl -LO https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.linux.x86_64.tar.xz
-              tar -xf shellcheck-v0.10.0.linux.x86_64.tar.xz
-              sudo mv shellcheck-v0.10.0/shellcheck /usr/local/bin/
-            fi
+#             if ! command -v shellcheck &>/dev/null; then
+#               curl -LO https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.linux.x86_64.tar.xz
+#               tar -xf shellcheck-v0.10.0.linux.x86_64.tar.xz
+#               sudo mv shellcheck-v0.10.0/shellcheck /usr/local/bin/
+#             fi
 
-            # kops
-            if ! command -v kops &>/dev/null; then
-              curl -Lo /tmp/kops-binary https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | grep tag_name | cut -d '"' -f 4)/kops-linux-amd64
-              chmod +x /tmp/kops-binary
-              sudo mv /tmp/kops-binary /usr/local/bin/kops
-            fi
+#             # kops
+#             if ! command -v kops &>/dev/null; then
+#               curl -Lo /tmp/kops-binary https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | grep tag_name | cut -d '"' -f 4)/kops-linux-amd64
+#               chmod +x /tmp/kops-binary
+#               sudo mv /tmp/kops-binary /usr/local/bin/kops
+#             fi
 
-            echo "✅ Herramientas listas"
-            echo "  kubectl      $(kubectl version --client --short 2>/dev/null || kubectl version --client)"
-            echo "  helm         $(helm version --short)"
-            echo "  kubeconform  $(kubeconform -v)"
-            echo "  shellcheck   $(shellcheck --version | grep version:)"
-            echo "  yamllint     $(yamllint --version)"
-            echo "  python3      $(python3 --version)"
-            echo "  kops         $(kops version)"
+#             echo "✅ Herramientas listas"
+#             echo "  kubectl      $(kubectl version --client --short 2>/dev/null || kubectl version --client)"
+#             echo "  helm         $(helm version --short)"
+#             echo "  kubeconform  $(kubeconform -v)"
+#             echo "  shellcheck   $(shellcheck --version | grep version:)"
+#             echo "  yamllint     $(yamllint --version)"
+#             echo "  python3      $(python3 --version)"
+#             echo "  kops         $(kops version)"
 
-      - task: Bash@3
-        displayName: Lint YAML files
-        inputs:
-          targetType: 'inline'
-          script: |
-            yamllint $(pregunta2_dir) $(pregunta3_dir) $(pregunta5_dir)
+#       - task: Bash@3
+#         displayName: Lint YAML files
+#         inputs:
+#           targetType: 'inline'
+#           script: |
+#             yamllint $(pregunta2_dir) $(pregunta3_dir) $(pregunta5_dir)
 
-      - task: Bash@3
-        displayName: Validate Kubernetes manifests
-        inputs:
-          targetType: 'inline'
-          script: |
-            kubeconform -strict -summary $(pregunta2_dir)/kubernetes/*.yaml
+#       - task: Bash@3
+#         displayName: Validate Kubernetes manifests
+#         inputs:
+#           targetType: 'inline'
+#           script: |
+#             kubeconform -strict -summary $(pregunta2_dir)/kubernetes/*.yaml
 
-      - task: Bash@3
-        displayName: Validate Helm chart rendering
-        inputs:
-          targetType: 'inline'
-          script: |
-            helm template nginx oci://registry-1.docker.io/bitnamicharts/nginx -f $(pregunta3_dir)/helm/values-nginx.yaml
+#       - task: Bash@3
+#         displayName: Validate Helm chart rendering
+#         inputs:
+#           targetType: 'inline'
+#           script: |
+#             helm template nginx oci://registry-1.docker.io/bitnamicharts/nginx -f $(pregunta3_dir)/helm/values-nginx.yaml
 
-      - task: Bash@3
-        displayName: Check shell scripts
-        inputs:
-          targetType: 'inline'
-          script: |
-            shellcheck $(kops_directory)/*.sh $(pregunta2_dir)/scripts/*.sh || true
+#       - task: Bash@3
+#         displayName: Check shell scripts
+#         inputs:
+#           targetType: 'inline'
+#           script: |
+#             shellcheck $(kops_directory)/*.sh $(pregunta2_dir)/scripts/*.sh || true
 
-- stage: Deploy
-  displayName: Deploy Infrastructure
-  dependsOn: Build
-  condition: succeeded()
-  jobs:
-    - job: deploy_infrastructure
-      steps:
-      - task: AWSCLI@1
-        displayName: Assume AWS Identity
-        inputs:
-          awsCredentials: '$(SVC_TC_AWS)'
-          regionName: '$(AWS_REGION)'
-          awsCommand: 'sts'
-          awsSubCommand: 'get-caller-identity'
+# - stage: Deploy
+#   displayName: Deploy Infrastructure
+#   dependsOn: Build
+#   condition: succeeded()
+#   jobs:
+#     - job: deploy_infrastructure
+#       steps:
+#       - task: AWSCLI@1
+#         displayName: Assume AWS Identity
+#         inputs:
+#           awsCredentials: '$(SVC_TC_AWS)'
+#           regionName: '$(AWS_REGION)'
+#           awsCommand: 'sts'
+#           awsSubCommand: 'get-caller-identity'
 
-      - task: Bash@3
-        displayName: Create Kops Cluster
-        inputs:
-          targetType: inline
-          script: |
-            chmod +x $(kops_directory)/kops-cluster.sh
-            bash $(kops_directory)/kops-cluster.sh
-        env:
-          KOPS_CLUSTER_NAME: $(KOPS_CLUSTER_NAME)
-          KOPS_STORAGE_BUCKET: $(KOPS_STORAGE_BUCKET)
-          AWS_REGION: $(AWS_REGION)
-          AWS_ZONES: $(AWS_ZONES)
+#       - task: Bash@3
+#         displayName: Create Kops Cluster
+#         inputs:
+#           targetType: inline
+#           script: |
+#             chmod +x $(kops_directory)/kops-cluster.sh
+#             bash $(kops_directory)/kops-cluster.sh
+#         env:
+#           KOPS_CLUSTER_NAME: $(KOPS_CLUSTER_NAME)
+#           KOPS_STORAGE_BUCKET: $(KOPS_STORAGE_BUCKET)
+#           AWS_REGION: $(AWS_REGION)
+#           AWS_ZONES: $(AWS_ZONES)
 
-      - task: Bash@3
-        displayName: Update kubeconfig via KOps
-        inputs:
-          targetType: inline
-          script: |
-            # Exportar el S3
-            kops export kubeconfig --admin --name $(KOPS_CLUSTER_NAME) --state s3://$(KOPS_STORAGE_BUCKET)
+#       - task: Bash@3
+#         displayName: Update kubeconfig via KOps
+#         inputs:
+#           targetType: inline
+#           script: |
+#             # Exportar el S3
+#             kops export kubeconfig --admin --name $(KOPS_CLUSTER_NAME) --state s3://$(KOPS_STORAGE_BUCKET)
 
-      - task: Bash@3
-        displayName: Deploy to Kubernetes (EKS - Manifestos)
-        inputs:
-          targetType: 'inline'
-          script: |
-            chmod +x $(pregunta2_dir)/scripts/deploy.sh
-            bash $(pregunta2_dir)/scripts/deploy.sh
+#       - task: Bash@3
+#         displayName: Deploy to Kubernetes (EKS - Manifestos)
+#         inputs:
+#           targetType: 'inline'
+#           script: |
+#             chmod +x $(pregunta2_dir)/scripts/deploy.sh
+#             bash $(pregunta2_dir)/scripts/deploy.sh
 
-      - task: Bash@3
-        displayName: Deploy Observability Stack (Grafana, Prom, Loki, Tempo, OTel)
-        inputs:
-          targetType: inline
-          script: |
-            echo "Adding Helm Repositories..."
-            helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-            helm repo add grafana https://grafana.github.io/helm-charts
-            helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
-            helm repo update
+#       - task: Bash@3
+#         displayName: Deploy Observability Stack (Grafana, Prom, Loki, Tempo, OTel)
+#         inputs:
+#           targetType: inline
+#           script: |
+#             echo "Adding Helm Repositories..."
+#             helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+#             helm repo add grafana https://grafana.github.io/helm-charts
+#             helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+#             helm repo update
             
-            echo "Creating namespace observability..."
-            kubectl create namespace observability --dry-run=client -o yaml | kubectl apply -f -
+#             echo "Creating namespace observability..."
+#             kubectl create namespace observability --dry-run=client -o yaml | kubectl apply -f -
 
-            echo "Creating K8s Secret with EC2 SD scrape config (credenciales AWS from Variable Group)..."
-            kubectl create secret generic prometheus-ec2-scrape-config \
-              --namespace observability \
-              --from-literal=scrape-config.yaml="
-            - job_name: ec2-terraform-nodes
-              ec2_sd_configs:
-                - region: $(AWS_REGION)
-                  access_key: $(AWS_ACCESS_KEY_ID)
-                  secret_key: $(AWS_SECRET_ACCESS_KEY)
-                  port: 9100
-                  filters:
-                    - name: tag:Name
-                      values: [web-server-asg]
-                    - name: instance-state-name
-                      values: [running]
-              relabel_configs:
-                - source_labels: [__meta_ec2_public_ip]
-                  target_label: __address__
-                  replacement: '\${1}:9100'
-                - source_labels: [__meta_ec2_public_ip]
-                  target_label: public_ip
-                - source_labels: [__meta_ec2_instance_id]
-                  target_label: instance_id
-                - source_labels: [__meta_ec2_tag_Name]
-                  target_label: instance_name
-            " \
-              --dry-run=client -o yaml | kubectl apply -f -
+#             echo "Creating K8s Secret with EC2 SD scrape config (credenciales AWS from Variable Group)..."
+#             kubectl create secret generic prometheus-ec2-scrape-config \
+#               --namespace observability \
+#               --from-literal=scrape-config.yaml="
+#             - job_name: ec2-terraform-nodes
+#               ec2_sd_configs:
+#                 - region: $(AWS_REGION)
+#                   access_key: $(AWS_ACCESS_KEY_ID)
+#                   secret_key: $(AWS_SECRET_ACCESS_KEY)
+#                   port: 9100
+#                   filters:
+#                     - name: tag:Name
+#                       values: [web-server-asg]
+#                     - name: instance-state-name
+#                       values: [running]
+#               relabel_configs:
+#                 - source_labels: [__meta_ec2_public_ip]
+#                   target_label: __address__
+#                   replacement: '\${1}:9100'
+#                 - source_labels: [__meta_ec2_public_ip]
+#                   target_label: public_ip
+#                 - source_labels: [__meta_ec2_instance_id]
+#                   target_label: instance_id
+#                 - source_labels: [__meta_ec2_tag_Name]
+#                   target_label: instance_name
+#             " \
+#               --dry-run=client -o yaml | kubectl apply -f -
 
-            echo "Installing Kube-Prometheus-Stack (Prometheus, Grafana, Alertmanager, CRDs)..."
-            helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
-              --namespace observability --create-namespace \
-              -f $(pregunta5_dir)/observabilidad/prometheus-values.yaml \
-              --set grafana.service.type=LoadBalancer \
-              --set grafana.adminPassword=admin \
-              --set prometheus.service.type=LoadBalancer \
-              --set alertmanager.service.type=LoadBalancer \
-              --set "grafana.additionalDataSources[0].name=Loki" \
-              --set "grafana.additionalDataSources[0].type=loki" \
-              --set "grafana.additionalDataSources[0].url=http://loki.observability.svc.cluster.local:3100"
+#             echo "Installing Kube-Prometheus-Stack (Prometheus, Grafana, Alertmanager, CRDs)..."
+#             helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+#               --namespace observability --create-namespace \
+#               -f $(pregunta5_dir)/observabilidad/prometheus-values.yaml \
+#               --set grafana.service.type=LoadBalancer \
+#               --set grafana.adminPassword=admin \
+#               --set prometheus.service.type=LoadBalancer \
+#               --set alertmanager.service.type=LoadBalancer \
+#               --set "grafana.additionalDataSources[0].name=Loki" \
+#               --set "grafana.additionalDataSources[0].type=loki" \
+#               --set "grafana.additionalDataSources[0].url=http://loki.observability.svc.cluster.local:3100"
             
-            echo "Esperando a que los CRDs de Prometheus estén disponibles..."
-            kubectl wait --for=condition=established --timeout=60s crd/servicemonitors.monitoring.coreos.com
+#             echo "Esperando a que los CRDs de Prometheus estén disponibles..."
+#             kubectl wait --for=condition=established --timeout=60s crd/servicemonitors.monitoring.coreos.com
             
-            echo "Installing Tempo (Traces)..."
-            helm upgrade --install tempo grafana/tempo \
-              --namespace observability --set search.enabled=true
+#             echo "Installing Tempo (Traces)..."
+#             helm upgrade --install tempo grafana/tempo \
+#               --namespace observability --set search.enabled=true
             
-            echo "Installing Loki (Logs)..."
-            helm upgrade --install loki grafana/loki-stack \
-              --namespace observability --set loki.persistence.enabled=true --set loki.persistence.size=10Gi \
-              --set grafana.sidecar.datasources.enabled=false
+#             echo "Installing Loki (Logs)..."
+#             helm upgrade --install loki grafana/loki-stack \
+#               --namespace observability --set loki.persistence.enabled=true --set loki.persistence.size=10Gi \
+#               --set grafana.sidecar.datasources.enabled=false
             
-            echo "Installing OpenTelemetry Collector..."
-            helm upgrade --install otel-collector open-telemetry/opentelemetry-collector \
-              --namespace observability -f $(pregunta5_dir)/observabilidad/otel-values.yaml
+#             echo "Installing OpenTelemetry Collector..."
+#             helm upgrade --install otel-collector open-telemetry/opentelemetry-collector \
+#               --namespace observability -f $(pregunta5_dir)/observabilidad/otel-values.yaml
 
-      - task: Bash@3
-        displayName: Deploy Nginx with Helm
-        inputs:
-          targetType: inline
-          script: |
-            helm upgrade --install nginx oci://registry-1.docker.io/bitnamicharts/nginx \
-              -f $(pregunta3_dir)/helm/values-nginx.yaml \
-              --namespace memrade-frontend \
-              --create-namespace
+#       - task: Bash@3
+#         displayName: Deploy Nginx with Helm
+#         inputs:
+#           targetType: inline
+#           script: |
+#             helm upgrade --install nginx oci://registry-1.docker.io/bitnamicharts/nginx \
+#               -f $(pregunta3_dir)/helm/values-nginx.yaml \
+#               --namespace memrade-frontend \
+#               --create-namespace
 
-      - task: Bash@3
-        displayName: Print Public URLs
-        inputs:
-          targetType: inline
-          script: |
-            echo "=============================================================================="
-            echo "🎉 DESPLIEGUES FINALIZADOS CON ÉXITO 🎉"
-            echo "=============================================================================="
-            echo "Extrayendo URLs públicas de AWS Elastic Load Balancer..."
+#       - task: Bash@3
+#         displayName: Print Public URLs
+#         inputs:
+#           targetType: inline
+#           script: |
+#             echo "=============================================================================="
+#             echo "🎉 DESPLIEGUES FINALIZADOS CON ÉXITO 🎉"
+#             echo "=============================================================================="
+#             echo "Extrayendo URLs públicas de AWS Elastic Load Balancer..."
             
-            echo "🌐 URL 1: Nginx (Manifiestos manuales / ConfigMap propio)"
-            MANIFEST_URL=""
-            while [ -z "$MANIFEST_URL" ]; do
-              echo "Esperando a que AWS asigne el DNS para Nginx Manual... (esto puede tardar 2-3 min)"
-              sleep 10
-              MANIFEST_URL=$(kubectl get svc nginx-service -n memrade-frontend -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-            done
-            echo "-> http://$MANIFEST_URL"
+#             echo "🌐 URL 1: Nginx (Manifiestos manuales / ConfigMap propio)"
+#             MANIFEST_URL=""
+#             while [ -z "$MANIFEST_URL" ]; do
+#               echo "Esperando a que AWS asigne el DNS para Nginx Manual... (esto puede tardar 2-3 min)"
+#               sleep 10
+#               MANIFEST_URL=$(kubectl get svc nginx-service -n memrade-frontend -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+#             done
+#             echo "-> http://$MANIFEST_URL"
             
-            echo "🌐 URL 2: Nginx (Helm Chart)"
-            HELM_URL=""
-            while [ -z "$HELM_URL" ]; do
-              echo "Esperando a que AWS asigne el DNS para Nginx Helm... (esto puede tardar 2-3 min)"
-              sleep 10
-              HELM_URL=$(kubectl get svc nginx -n memrade-frontend -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-            done
-            echo "-> http://$HELM_URL"
+#             echo "🌐 URL 2: Nginx (Helm Chart)"
+#             HELM_URL=""
+#             while [ -z "$HELM_URL" ]; do
+#               echo "Esperando a que AWS asigne el DNS para Nginx Helm... (esto puede tardar 2-3 min)"
+#               sleep 10
+#               HELM_URL=$(kubectl get svc nginx -n memrade-frontend -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+#             done
+#             echo "-> http://$HELM_URL"
 
-            echo "🌐 URL 3: Grafana Observability Dashboards"
-            GRAFANA_URL=""
-            while [ -z "$GRAFANA_URL" ] || [ "$GRAFANA_URL" = "<pending>" ]; do
-              echo "Esperando a que AWS asigne el DNS para Grafana... (esto puede tardar 2-3 min)"
-              sleep 10
-              GRAFANA_URL=$(kubectl get svc kube-prometheus-stack-grafana -n observability -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-            done
-            echo "Accede a Grafana con el usuario 'admin' y contraseña 'admin'."
-            echo "-> http://$GRAFANA_URL"
+#             echo "🌐 URL 3: Grafana Observability Dashboards"
+#             GRAFANA_URL=""
+#             while [ -z "$GRAFANA_URL" ] || [ "$GRAFANA_URL" = "<pending>" ]; do
+#               echo "Esperando a que AWS asigne el DNS para Grafana... (esto puede tardar 2-3 min)"
+#               sleep 10
+#               GRAFANA_URL=$(kubectl get svc kube-prometheus-stack-grafana -n observability -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+#             done
+#             echo "Accede a Grafana con el usuario 'admin' y contraseña 'admin'."
+#             echo "-> http://$GRAFANA_URL"
 
-            echo "📊 URL 4: Prometheus (Métricas y Targets)"
-            PROM_URL=""
-            while [ -z "$PROM_URL" ] || [ "$PROM_URL" = "<pending>" ]; do
-              echo "Esperando a que AWS asigne el DNS para Prometheus... (esto puede tardar 2-3 min)"
-              sleep 10
-              PROM_URL=$(kubectl get svc kube-prometheus-stack-prometheus -n observability -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-            done
-            echo "-> http://$PROM_URL:9090"
-            echo "-> http://$PROM_URL:9090/targets  (ver estado de los nodos)"
+#             echo "📊 URL 4: Prometheus (Métricas y Targets)"
+#             PROM_URL=""
+#             while [ -z "$PROM_URL" ] || [ "$PROM_URL" = "<pending>" ]; do
+#               echo "Esperando a que AWS asigne el DNS para Prometheus... (esto puede tardar 2-3 min)"
+#               sleep 10
+#               PROM_URL=$(kubectl get svc kube-prometheus-stack-prometheus -n observability -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+#             done
+#             echo "-> http://$PROM_URL:9090"
+#             echo "-> http://$PROM_URL:9090/targets  (ver estado de los nodos)"
 
-            echo "🔔 URL 5: Alertmanager"
-            AM_URL=""
-            while [ -z "$AM_URL" ] || [ "$AM_URL" = "<pending>" ]; do
-              echo "Esperando a que AWS asigne el DNS para Alertmanager... (esto puede tardar 2-3 min)"
-              sleep 10
-              AM_URL=$(kubectl get svc kube-prometheus-stack-alertmanager -n observability -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-            done
-            echo "-> http://$AM_URL:9093"
-            echo "=============================================================================="
+#             echo "🔔 URL 5: Alertmanager"
+#             AM_URL=""
+#             while [ -z "$AM_URL" ] || [ "$AM_URL" = "<pending>" ]; do
+#               echo "Esperando a que AWS asigne el DNS para Alertmanager... (esto puede tardar 2-3 min)"
+#               sleep 10
+#               AM_URL=$(kubectl get svc kube-prometheus-stack-alertmanager -n observability -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+#             done
+#             echo "-> http://$AM_URL:9093"
+#             echo "=============================================================================="
 
-- stage: DestroyApproval
-  displayName: Approve Destroy Infrastructure
-  condition: always()
-  jobs:
-  - deployment: DestroyApprovalJob
-    environment: 'DeploymentApprovers'
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - script: echo "Esperando aprobación para continuar con el destroy..."
-            displayName: 'Approval Step'
+# - stage: DestroyApproval
+#   displayName: Approve Destroy Infrastructure
+#   condition: always()
+#   jobs:
+#   - deployment: DestroyApprovalJob
+#     environment: 'DeploymentApprovers'
+#     strategy:
+#       runOnce:
+#         deploy:
+#           steps:
+#           - script: echo "Esperando aprobación para continuar con el destroy..."
+#             displayName: 'Approval Step'
 
 - stage: Destroy
   displayName: Destroy Infrastructure
