@@ -74,15 +74,6 @@ stages:
   jobs:
     - job: deploy_infrastructure
       steps:
-      # - task: Bash@3
-      #   displayName: Configure AWS Credentials
-      #   inputs:
-      #     targetType: inline
-      #     script: |
-      #       aws configure set aws_access_key_id $(AWS_ACCESS_KEY_ID)
-      #       aws configure set aws_secret_access_key $(AWS_SECRET_ACCESS_KEY)
-      #       aws configure set default.region $(AWS_REGION)
-
       - task: AWSCLI@1
         displayName: Assume AWS Identity
         inputs:
@@ -127,8 +118,7 @@ stages:
 
 - stage: DestroyApproval
   displayName: Approve Destroy Infrastructure
-  dependsOn: Deploy
-  condition: and(succeeded(), eq('${{ parameters.DeleteKopsInfrastructure }}', false))
+  condition: eq('${{ parameters.DeleteKopsInfrastructure }}', false)
   jobs:
   - deployment: DestroyApprovalJob
     environment: 'DeploymentApprovers'
@@ -147,15 +137,6 @@ stages:
     - job: destroy_infrastructure
       displayName: Destroy Infrastructure
       steps:
-      # - task: Bash@3
-      #   displayName: Configure AWS Credentials
-      #   inputs:
-      #     targetType: inline
-      #     script: |
-      #       aws configure set aws_access_key_id $(AWS_ACCESS_KEY_ID)
-      #       aws configure set aws_secret_access_key $(AWS_SECRET_ACCESS_KEY)
-      #       aws configure set default.region $(AWS_REGION)
-
       - task: AWSCLI@1
         displayName: Assume AWS Identity
         inputs:

@@ -113,15 +113,6 @@ stages:
   jobs:
     - job: deploy_infrastructure
       steps:
-      # - task: Bash@3
-      #   displayName: Configure AWS Credentials
-      #   inputs:
-      #     targetType: inline
-      #     script: |
-      #       aws configure set aws_access_key_id $(AWS_ACCESS_KEY_ID)
-      #       aws configure set aws_secret_access_key $(AWS_SECRET_ACCESS_KEY)
-      #       aws configure set default.region $(AWS_REGION)
-
       - task: AWSCLI@1
         displayName: Assume AWS Identity
         inputs:
@@ -227,8 +218,7 @@ stages:
             
             echo "Installing OpenTelemetry Collector..."
             helm upgrade --install otel-collector open-telemetry/opentelemetry-collector \
-              --namespace observability -f $(pregunta5_dir)/observabilidad/otel-values.yaml \
-              --set service.type=LoadBalancer
+              --namespace observability -f $(pregunta5_dir)/observabilidad/otel-values.yaml
 
       - task: Bash@3
         displayName: Deploy Nginx with Helm
@@ -288,45 +278,7 @@ stages:
             echo "-> http://$PROM_URL:9090"
             echo "-> http://$PROM_URL:9090/targets  (ver estado de los nodos)"
 
-            echo "🔭 URL 5: OpenTelemetry Collector"
-            OTEL_URL=""
-            while [ -z "$OTEL_URL" ] || [ "$OTEL_URL" = "<pending>" ]; do
-              echo "Esperando a que AWS asigne el DNS para OTel Collector... (esto puede tardar 2-3 min)"
-              sleep 10
-              OTEL_URL=$(kubectl get svc otel-collector-opentelemetry-collector -n observability -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-            done
-
-            echo "Testing OpenTelemetry endpoint: http://$OTEL_URL:4318/v1/traces"
-            NOW=$(date +%s%N)
-            curl -X POST http://$OTEL_URL:4318/v1/traces \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"resourceSpans\":[{
-                \"resource\":{
-                  \"attributes\":[
-                    {\"key\":\"service.name\",\"value\":{\"stringValue\":\"demo-service\"}}
-                  ]
-                },
-                \"scopeSpans\":[{
-                  \"spans\":[{
-                    \"traceId\":\"5B8EFFF798038103D269B633813FC60C\",
-                    \"spanId\":\"EEE19B7EC3C1B174\",
-                    \"name\":\"demo-span\",
-                    \"kind\":1,
-                    \"startTimeUnixNano\":\"$NOW\",
-                    \"endTimeUnixNano\":\"$NOW\"
-                  }]
-                }]
-              }]
-            }"
-
-            if [ "$response" = "200" ]; then
-              echo "✅ OpenTelemetry Collector is working"
-            else
-              echo "❌ OpenTelemetry Collector is not working (HTTP $response)"
-            fi
-
-            echo "🔔 URL 6: Alertmanager"
+            echo "🔔 URL 5: Alertmanager"
             AM_URL=""
             while [ -z "$AM_URL" ] || [ "$AM_URL" = "<pending>" ]; do
               echo "Esperando a que AWS asigne el DNS para Alertmanager... (esto puede tardar 2-3 min)"
@@ -338,7 +290,6 @@ stages:
 
 - stage: DestroyApproval
   displayName: Approve Destroy Infrastructure
-  dependsOn: Deploy
   jobs:
   - deployment: DestroyApprovalJob
     environment: 'DeploymentApprovers'
@@ -357,15 +308,6 @@ stages:
     - job: destroy_infrastructure
       displayName: Destroy Infrastructure
       steps:
-      # - task: Bash@3
-      #   displayName: Configure AWS Credentials
-      #   inputs:
-      #     targetType: inline
-      #     script: |
-      #       aws configure set aws_access_key_id $(AWS_ACCESS_KEY_ID)
-      #       aws configure set aws_secret_access_key $(AWS_SECRET_ACCESS_KEY)
-      #       aws configure set default.region $(AWS_REGION)
-
       - task: AWSCLI@1
         displayName: Assume AWS Identity
         inputs:
