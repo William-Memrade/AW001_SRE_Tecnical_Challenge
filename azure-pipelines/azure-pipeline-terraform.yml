@@ -19,10 +19,10 @@ name: Deploy Terraform Infrastructure
 
 variables:
   - group: kops-aws-credentials
-  - name: working_directory
-    value: '$(System.DefaultWorkingDirectory)/terraform'
+  - name: terraform_dir
+    value: '$(System.DefaultWorkingDirectory)/pregunta4/Seccion1/terraform'
   - name: kops_directory
-    value: '$(System.DefaultWorkingDirectory)/kops'
+    value: '$(System.DefaultWorkingDirectory)/pregunta1/Seccion1/kops'
 
 stages:
 - stage: Build
@@ -56,13 +56,13 @@ stages:
         inputs:
           targetType: 'inline'
           script: |
-            shellcheck $(working_directory)/scripts/*.sh || true
+            shellcheck $(terraform_dir)/scripts/*.sh || true
 
       - task: Bash@3
         displayName: Validate Terraform code
         inputs:
           targetType: 'inline'
-          workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+          workingDirectory: '$(terraform_dir)'
           script: |
             /usr/local/bin/terraform init -backend=false
             /usr/local/bin/terraform validate
@@ -95,7 +95,7 @@ stages:
         displayName: Planning Terraform Infrastructure
         inputs:
           targetType: inline
-          workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+          workingDirectory: '$(terraform_dir)'
           script: |
             /usr/local/bin/terraform init
             /usr/local/bin/terraform plan -out=tfplan
@@ -104,7 +104,7 @@ stages:
         displayName: Deploy Terraform Infrastructure
         inputs:
           targetType: inline
-          workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+          workingDirectory: '$(terraform_dir)'
           script: |
             /usr/local/bin/terraform apply -auto-approve tfplan
 
@@ -118,7 +118,7 @@ stages:
             echo "=============================================================================="
             echo "Extrayendo URL pública del AWS Elastic Load Balancer..."
             
-            cd $(System.DefaultWorkingDirectory)/terraform
+            cd $(terraform_dir)
             TF_ALB_URL=$(/usr/local/bin/terraform output -raw alb_dns_name)
 
             echo "🌐 Nginx Application"
@@ -168,7 +168,7 @@ stages:
         displayName: Destroy Terraform Infrastructure
         inputs:
           targetType: inline
-          workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+          workingDirectory: '$(terraform_dir)'
           script: |
             /usr/local/bin/terraform init
             /usr/local/bin/terraform destroy -auto-approve

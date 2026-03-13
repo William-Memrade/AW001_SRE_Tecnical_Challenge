@@ -13,10 +13,14 @@ name: Deploy Kops Cluster
 
 variables:
   - group: kops-aws-credentials
-  - name: working_directory
-    value: '$(System.DefaultWorkingDirectory)/k8s'
   - name: kops_directory
-    value: '$(System.DefaultWorkingDirectory)/kops'
+    value: '$(System.DefaultWorkingDirectory)/pregunta1/Seccion1/kops'
+  - name: pregunta2_dir
+    value: '$(System.DefaultWorkingDirectory)/pregunta2/Seccion1'
+  - name: pregunta3_dir
+    value: '$(System.DefaultWorkingDirectory)/pregunta3/Seccion1'
+  - name: pregunta5_dir
+    value: '$(System.DefaultWorkingDirectory)/pregunta5/Seccion1'
 
 stages:
 - stage: Build
@@ -79,28 +83,28 @@ stages:
         inputs:
           targetType: 'inline'
           script: |
-            yamllint $(working_directory)
+            yamllint $(pregunta2_dir) $(pregunta3_dir) $(pregunta5_dir)
 
       - task: Bash@3
         displayName: Validate Kubernetes manifests
         inputs:
           targetType: 'inline'
           script: |
-            kubeconform -strict -summary $(working_directory)/kubernetes/*.yaml
+            kubeconform -strict -summary $(pregunta2_dir)/kubernetes/*.yaml
 
       - task: Bash@3
         displayName: Validate Helm chart rendering
         inputs:
           targetType: 'inline'
           script: |
-            helm template nginx oci://registry-1.docker.io/bitnamicharts/nginx -f $(working_directory)/helm/values-nginx.yaml
+            helm template nginx oci://registry-1.docker.io/bitnamicharts/nginx -f $(pregunta3_dir)/helm/values-nginx.yaml
 
       - task: Bash@3
         displayName: Check shell scripts
         inputs:
           targetType: 'inline'
           script: |
-            shellcheck $(working_directory)/scripts/*.sh || true
+            shellcheck $(kops_directory)/*.sh $(pregunta2_dir)/scripts/*.sh || true
 
 - stage: Deploy
   displayName: Deploy Infrastructure
@@ -152,8 +156,8 @@ stages:
         inputs:
           targetType: 'inline'
           script: |
-            chmod +x $(working_directory)/scripts/deploy.sh
-            bash $(working_directory)/scripts/deploy.sh
+            chmod +x $(pregunta2_dir)/scripts/deploy.sh
+            bash $(pregunta2_dir)/scripts/deploy.sh
 
       - task: Bash@3
         displayName: Deploy Observability Stack (Grafana, Prom, Loki, Tempo, OTel)
@@ -200,7 +204,7 @@ stages:
             echo "Installing Kube-Prometheus-Stack (Prometheus, Grafana, Alertmanager, CRDs)..."
             helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
               --namespace observability --create-namespace \
-              -f $(working_directory)/helm/prometheus-values.yaml \
+              -f $(pregunta5_dir)/observabilidad/prometheus-values.yaml \
               --set grafana.service.type=LoadBalancer \
               --set grafana.adminPassword=admin \
               --set prometheus.service.type=LoadBalancer \
@@ -223,7 +227,7 @@ stages:
             
             echo "Installing OpenTelemetry Collector..."
             helm upgrade --install otel-collector open-telemetry/opentelemetry-collector \
-              --namespace observability -f $(working_directory)/helm/otel-values.yaml \
+              --namespace observability -f $(pregunta5_dir)/observabilidad/otel-values.yaml \
               --set service.type=LoadBalancer
 
       - task: Bash@3
@@ -232,7 +236,7 @@ stages:
           targetType: inline
           script: |
             helm upgrade --install nginx oci://registry-1.docker.io/bitnamicharts/nginx \
-              -f $(working_directory)/helm/values-nginx.yaml \
+              -f $(pregunta3_dir)/helm/values-nginx.yaml \
               --namespace memrade-frontend \
               --create-namespace
 
