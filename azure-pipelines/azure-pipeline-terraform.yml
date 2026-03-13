@@ -118,7 +118,8 @@ stages:
 
 - stage: DestroyApproval
   displayName: Approve Destroy Infrastructure
-  condition: eq('${{ parameters.DeleteKopsInfrastructure }}', false)
+  dependsOn: Deploy
+  condition: and(succeeded(), eq('${{ parameters.DeleteKopsInfrastructure }}', false))
   jobs:
   - deployment: DestroyApprovalJob
     environment: 'DeploymentApprovers'
@@ -132,11 +133,10 @@ stages:
 - stage: Destroy
   displayName: Destroy Infrastructure
   dependsOn: DestroyApproval
-  condition: and(succeededOrFailed(), eq('${{ parameters.DeleteKopsInfrastructure }}', false))
+  condition: and(succeeded(), eq('${{ parameters.DeleteKopsInfrastructure }}', false))
   jobs:
     - job: destroy_infrastructure
       displayName: Destroy Infrastructure
-      condition: always()
       steps:
       - task: AWSCLI@1
         displayName: Assume AWS Identity
