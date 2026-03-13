@@ -40,17 +40,13 @@ stages:
           targetType: 'inline'
           script: |
             sudo apt-get update -y
-            sudo apt-get install -y python3-pip python3 unzip
-            pip3 install yamllint --user || pip3 install yamllint --break-system-packages
 
-            curl -LO https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.linux.x86_64.tar.xz
-            tar -xf shellcheck-v0.10.0.linux.x86_64.tar.xz
-            sudo mv shellcheck-v0.10.0/shellcheck /usr/local/bin/
-
-            curl -fsSL https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip -o /tmp/terraform.zip
-            cd /tmp && unzip -q -o terraform.zip
-            sudo rm -rf /usr/local/bin/terraform
-            sudo mv /tmp/terraform /usr/local/bin/terraform
+            if ! command -v terraform &>/dev/null; then
+              curl -fsSL https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip -o /tmp/terraform.zip
+              cd /tmp && unzip -q -o terraform.zip
+              sudo rm -rf /usr/local/bin/terraform
+              sudo mv /tmp/terraform /usr/local/bin/terraform
+            fi
 
       - task: Bash@3
         displayName: Check shell scripts

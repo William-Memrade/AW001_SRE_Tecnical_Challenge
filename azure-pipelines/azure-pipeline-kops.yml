@@ -34,21 +34,37 @@ stages:
           script: |
             sudo apt-get update -y
             sudo apt-get install -y python3-pip python3
-            pip3 install yamllint --user || pip3 install yamllint --break-system-packages
+            pip3 install yamllint --break-system-packages 2>/dev/null || pip3 install yamllint --user
 
-            curl -LO https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl
-            chmod +x kubectl
-            sudo mv kubectl /usr/local/bin/
+            if ! command -v kubectl &>/dev/null; then
+              curl -LO https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl
+              chmod +x kubectl
+              sudo mv kubectl /usr/local/bin/
+            fi
 
-            curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+            if ! command -v helm &>/dev/null; then
+              curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+            fi
 
-            curl -L https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz -o kubeconform.tar.gz
-            tar -xzf kubeconform.tar.gz
-            sudo mv kubeconform /usr/local/bin/
+            if ! command -v kubeconform &>/dev/null; then
+              curl -L https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz -o /tmp/kubeconform.tar.gz
+              tar -xzf /tmp/kubeconform.tar.gz -C /tmp/
+              sudo mv /tmp/kubeconform /usr/local/bin/
+            fi
 
-            curl -LO https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.linux.x86_64.tar.xz
-            tar -xf shellcheck-v0.10.0.linux.x86_64.tar.xz
-            sudo mv shellcheck-v0.10.0/shellcheck /usr/local/bin/
+            if ! command -v shellcheck &>/dev/null; then
+              curl -LO https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.linux.x86_64.tar.xz
+              tar -xf shellcheck-v0.10.0.linux.x86_64.tar.xz
+              sudo mv shellcheck-v0.10.0/shellcheck /usr/local/bin/
+            fi
+
+            echo "✅ Herramientas listas:"
+            echo "  kubectl     : $(kubectl version --client --short 2>/dev/null || kubectl version --client)"
+            echo "  helm        : $(helm version --short)"
+            echo "  kubeconform : $(kubeconform -v)"
+            echo "  shellcheck  : $(shellcheck --version | grep version:)"
+            echo "  yamllint    : $(yamllint --version)"
+            echo "  python3     : $(python3 --version)"
 
       - task: Bash@3
         displayName: Lint YAML files
