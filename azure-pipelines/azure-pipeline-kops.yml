@@ -220,6 +220,10 @@ stages:
             helm upgrade --install otel-collector open-telemetry/opentelemetry-collector \
               --namespace observability -f $(pregunta5_dir)/observabilidad/otel-values.yaml
 
+            echo "Applying observability extras (alerts, dashboards)..."
+            chmod +x $(pregunta5_dir)/observabilidad/deploy_extras.sh || true
+            bash $(pregunta5_dir)/observabilidad/deploy_extras.sh || true
+
       - task: Bash@3
         displayName: Deploy Nginx with Helm
         inputs:
