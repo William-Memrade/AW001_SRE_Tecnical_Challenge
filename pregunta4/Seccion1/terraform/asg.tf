@@ -43,7 +43,7 @@ resource "aws_autoscaling_group" "web_asg" {
   # Launch instances in private subnets so they are not publicly addressable
   vpc_zone_identifier = aws_subnet.private[*].id
   target_group_arns   = [aws_lb_target_group.web_tg.arn]
-  health_check_type   = "ELB"
+  health_check_type   = "EC2"
   health_check_grace_period = 300
 
   min_size         = 2
