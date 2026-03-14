@@ -3,62 +3,91 @@ parameters:
     displayName: "URL Nginx (Manifiestos K8s)"
     type: string
     default: ""
+
   - name: HELM_URL
     displayName: "URL Nginx (Helm Chart)"
     type: string
     default: ""
+
   - name: TERRAFORM_URL
     displayName: "URL ALB (Terraform Fleet)"
     type: string
     default: ""
+
   - name: RPS
-    displayName: "Peticiones por segundo POR URL"
+    displayName: "Peticiones por segundo"
     type: number
-    default: 10
+    default: 50
+
   - name: DURATION
-    displayName: "Duración de la prueba (segundos)"
+    displayName: "Duración prueba (segundos)"
     type: number
-    default: 180
+    default: 60
 
-trigger: none # Manual trigger only
+trigger: none
 
-pool: k8s-agents
+pool:
+  name: k8s-agents
 
 jobs:
+
 - job: StressTest
-  displayName: "Ejecutando Prueba de Estrés"
+  displayName: "HTTP Load Test"
+  timeoutInMinutes: 30
+
   steps:
+
   - checkout: self
-  
+
   - task: Bash@3
-    displayName: "Configurar Permisos del Script"
+    displayName: "Preparar Script"
     inputs:
       targetType: 'inline'
       script: |
         chmod +x $(System.DefaultWorkingDirectory)/scripts/stress-test.sh
 
   - task: Bash@3
-    displayName: "Ejecutar Estrés Multitarget"
+    displayName: "Test K8s Manual"
+    condition: ne('${{ parameters.K8S_MANUAL_URL }}','')
     inputs:
       targetType: 'inline'
       script: |
-        SCRIPT="$(System.DefaultWorkingDirectory)/scripts/stress-test.sh"
-        
-        if [ -n "${{ parameters.K8S_MANUAL_URL }}" ]; then
-          echo "🔥 Estresando K8s Manual..."
-          $SCRIPT "${{ parameters.K8S_MANUAL_URL }}" ${{ parameters.RPS }} ${{ parameters.DURATION }} &
-        fi
+        echo "🔥 Ejecutando prueba contra K8s Manual"
+        $(System.DefaultWorkingDirectory)/scripts/stress-test.sh \
+        "${{ parameters.K8S_MANUAL_URL }}" \
+        ${{ parameters.RPS }} \
+        ${{ parameters.DURATION }}
 
-        if [ -n "${{ parameters.HELM_URL }}" ]; then
-          echo "🔥 Estresando Helm Nginx..."
-          $SCRIPT "${{ parameters.HELM_URL }}" ${{ parameters.RPS }} ${{ parameters.DURATION }} &
-        fi
+  - task: Bash@3
+    displayName: "Test Helm Deployment"
+    condition: ne('${{ parameters.HELM_URL }}','')
+    inputs:
+      targetType: 'inline'
+      script: |
+        echo "🔥 Ejecutando prueba contra Helm Deployment"
+        $(System.DefaultWorkingDirectory)/scripts/stress-test.sh \
+        "${{ parameters.HELM_URL }}" \
+        ${{ parameters.RPS }} \
+        ${{ parameters.DURATION }}
 
-        if [ -n "${{ parameters.TERRAFORM_URL }}" ]; then
-          echo "🔥 Estresando Terraform Fleet..."
-          $SCRIPT "${{ parameters.TERRAFORM_URL }}" ${{ parameters.RPS }} ${{ parameters.DURATION }} &
-        fi
-        
-        echo "⏳ Esperando a que terminen todas las pruebas..."
-        wait
-        echo "✅ Todas las pruebas de carga han finalizado."
+  - task: Bash@3
+    displayName: "Test Terraform ALB"
+    condition: ne('${{ parameters.TERRAFORM_URL }}','')
+    inputs:
+      targetType: 'inline'
+      script: |
+        echo "🔥 Ejecutando prueba contra Terraform ALB"
+        $(System.DefaultWorkingDirectory)/scripts/stress-test.sh \
+        "${{ parameters.TERRAFORM_URL }}" \
+        ${{ parameters.RPS }} \
+        ${{ parameters.DURATION }}
+
+  - task: Bash@3
+    displayName: "Finalización"
+    inputs:
+      targetType: 'inline'
+      script: |
+        echo ""
+        echo "========================================"
+        echo "✅ Todas las pruebas de carga finalizaron"
+        echo "========================================"

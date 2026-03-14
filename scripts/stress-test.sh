@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Script de estrés para Nginx (versión segura)
-# Uso: ./stress-test.sh <URL> <RPS> <DURACION_SEGUNDOS>
-# Implementación: genera RPS * DURATION peticiones y las ejecuta con hasta RPS procesos concurrentes usando xargs.
+# Script de prueba de carga controlada para endpoints HTTP
+# Uso:
+# ./stress-test.sh <URL> <RPS> <DURACION>
 
 set -euo pipefail
 
@@ -10,33 +10,59 @@ URL=${1:-}
 RPS=${2:-}
 DURATION=${3:-}
 
-if [ -z "$URL" ] || [ -z "$RPS" ] || [ -z "$DURATION" ]; then
+if [[ -z "$URL" || -z "$RPS" || -z "$DURATION" ]]; then
     echo "Uso: $0 <URL> <RPS> <DURACION_SEGUNDOS>"
     exit 1
 fi
 
-echo "🚀 Iniciando prueba de estrés..."
-echo "📍 Objetivo: $URL"
-echo "📊 Tasa objetivo: $RPS peticiones/segundo"
-echo "⏱️ Duración: $DURATION segundos"
+echo "--------------------------------------------------"
+echo "🚀 Iniciando prueba de carga"
+echo "📍 URL: $URL"
+echo "📊 RPS objetivo: $RPS"
+echo "⏱ Duración: $DURATION segundos"
+echo "--------------------------------------------------"
 
-# Número total de peticiones
-N=$(( RPS * DURATION ))
+TOTAL=$((RPS * DURATION))
+CONCURRENCY=$((RPS / 2))
 
-echo "🔁 Total peticiones: $N"
-
-# Comprobación rápida de disponibilidad de xargs
-if ! command -v xargs >/dev/null 2>&1; then
-    echo "xargs no encontrado. Instala utilidades GNU xargs o usa vegeta (recomendado)."
-    exit 1
+if [[ "$CONCURRENCY" -lt 1 ]]; then
+  CONCURRENCY=1
 fi
 
-# Ejecutar peticiones con concurrencia controlada
-# -n1 : pasar un número por invocación (ignorado por curl)
-# -P ${RPS} : concurrencia máxima
-seq $N | xargs -n1 -P "$RPS" -I{} curl -s -o /dev/null -w "%{http_code}\n" "$URL" || true
+echo "🔁 Total de requests: $TOTAL"
+echo "⚙️ Concurrencia: $CONCURRENCY"
+echo ""
 
-echo "✅ Prueba de estrés finalizada."
+SUCCESS=0
+FAIL=0
 
-echo "Sugerencia: para pruebas más fiables y controladas instala 'vegeta' o 'wrk'. Ejemplo con vegeta:" 
-echo "  echo \"GET $URL\" | vegeta attack -rate=${RPS}/s -duration=${DURATION}s | vegeta report"
+run_request() {
+    CODE=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || echo "000")
+
+    if [[ "$CODE" == "200" ]]; then
+        echo "200"
+    else
+        echo "$CODE"
+    fi
+}
+
+export URL
+export -f run_request
+
+RESULTS=$(seq "$TOTAL" | xargs -n1 -P "$CONCURRENCY" -I{} bash -c 'run_request')
+
+SUCCESS=$(echo "$RESULTS" | grep -c '^200$' || true)
+FAIL=$((TOTAL - SUCCESS))
+
+echo ""
+echo "---------------- RESULTADOS ----------------"
+echo "Total Requests : $TOTAL"
+echo "Success (200)  : $SUCCESS"
+echo "Fail           : $FAIL"
+
+SUCCESS_RATE=$(awk "BEGIN {printf \"%.2f\", ($SUCCESS/$TOTAL)*100}")
+
+echo "Success Rate   : $SUCCESS_RATE %"
+echo "--------------------------------------------"
+echo "✅ Prueba finalizada"
+echo ""
