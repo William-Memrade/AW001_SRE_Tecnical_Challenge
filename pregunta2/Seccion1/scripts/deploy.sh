@@ -32,6 +32,12 @@ kubectl apply -f "${MANIFEST_DIR}/service.yaml"
 echo "5. Configurando Autoescalado (HPA)..."
 kubectl apply -f "${MANIFEST_DIR}/hpa.yaml"
 
+# 6. Desplegar nginx exporter para métricas de nginx (si se habilita stub_status)
+echo "6. Desplegando -enginxxporter (metrics)..."
+kubectl apply -f "${MANIFEST_DIR}/nginx-exporter.yaml"
+
+echo "7. NOTA: Asegúrate de exponer stub_status en nginx (por ejemplo /nginx_status) para que el exporter lo scrapee."
+
 echo "=============================================================================="
 echo " MANIFIESTOS DESPLEGADOS EXITOSAMENTE "
 echo "=============================================================================="

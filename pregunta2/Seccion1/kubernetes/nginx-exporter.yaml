@@ -1,0 +1,45 @@
+---
+# Deployment and Service for nginx prometheus exporter
+# NOTE: nginx must expose a metrics endpoint (e.g. stub_status) reachable by the exporter.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-exporter
+  namespace: memrade-frontend
+  labels:
+    app: nginx-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-exporter
+  template:
+    metadata:
+      labels:
+        app: nginx-exporter
+    spec:
+      containers:
+        - name: nginx-exporter
+          image: nginx/nginx-prometheus-exporter:0.11.0
+          args:
+            - -nginx.scrape-uri
+            - http://nginx-service/nginx_status
+          ports:
+            - containerPort: 9113
+              name: metrics
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-exporter
+  namespace: memrade-frontend
+  labels:
+    app: nginx-exporter
+spec:
+  selector:
+    app: nginx-exporter
+  ports:
+    - name: metrics
+      port: 9113
+      targetPort: 9113

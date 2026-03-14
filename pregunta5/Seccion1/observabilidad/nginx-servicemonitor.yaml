@@ -1,0 +1,18 @@
+---
+# ServiceMonitor for nginx-exporter (Prometheus Operator)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: nginx-exporter-sm
+  namespace: observability
+spec:
+  selector:
+    matchLabels:
+      app: nginx-exporter
+  namespaceSelector:
+    matchNames:
+      - memrade-frontend
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
