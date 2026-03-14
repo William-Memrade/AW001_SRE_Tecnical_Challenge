@@ -6,3 +6,10 @@ prometheus:
       enabled: true
       name: prometheus-ec2-scrape-config
       key: scrape-config.yaml
+
+# Grafana sidecar to auto-provision dashboards from ConfigMaps
+grafana:
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
