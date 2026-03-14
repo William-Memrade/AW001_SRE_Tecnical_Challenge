@@ -1,0 +1,38 @@
+---
+# Service exposing OTel Collector metrics and ServiceMonitor for Prometheus
+apiVersion: v1
+kind: Service
+metadata:
+  name: otel-collector-metrics
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: opentelemetry-collector
+    app.kubernetes.io/instance: otel-collector
+spec:
+  selector:
+    app.kubernetes.io/name: opentelemetry-collector
+    app.kubernetes.io/instance: otel-collector
+  ports:
+    - name: metrics
+      port: 8889
+      targetPort: 8889
+      protocol: TCP
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: otel-collector-sm
+  namespace: observability
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: opentelemetry-collector
+      app.kubernetes.io/instance: otel-collector
+  namespaceSelector:
+    matchNames:
+      - observability
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
